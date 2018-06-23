@@ -1,0 +1,1245 @@
+#    -*- mode: org -*-
+#+OPTIONS: reveal_center:t reveal_progress:t reveal_history:t reveal_control:t
+#+OPTIONS: reveal_mathjax:t reveal_rolling_links:nil reveal_keyboard:t reveal_overview:t num:nil
+#+OPTIONS: reveal_width:1600 reveal_height:900
+#+OPTIONS: toc:nil <:nil timestamp:nil email:t reveal_slide_number:"c/t"
+#+REVEAL_MARGIN: 0.1
+#+REVEAL_MIN_SCALE: 0.5
+#+REVEAL_MAX_SCALE: 2.5
+#+REVEAL_TRANS: none
+#+REVEAL_THEME: blood
+#+REVEAL_HLEVEL: 1
+#+REVEAL_EXTRA_CSS: ./presentation.css
+#+REVEAL_ROOT: ../reveal.js/
+
+#+TITLE: Mastering Move Semantics
+#+AUTHOR: Ben Deane
+#+EMAIL: bdeane@blizzard.com
+#+DATE: July 2018
+
+* Title slide settings                                             :noexport:
+#+BEGIN_SRC emacs-lisp
+(setq org-reveal-title-slide
+(concat "<h2>%t</h2>"
+"<div class='vertspace2'></div>"
+"<blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p>"
+"<div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote>"
+"<div class='vertspace3'></div>"
+"<h3>%a / <a href=\"mailto:bdeane@blizzard.com\">bdeane@blizzard.com</a> / "
+"<a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3>"
+"<h4>%d</h4>"))
+(set-face-foreground 'font-lock-comment-face "dark green")
+#+END_SRC
+
+* Get Ready
+
+1. What happens when we ~move~ something?
+1. Copy elision (RVO)
+1. Putting stuff into a ~vector~
+1. ~initializer_list~
+1. Putting stuff into a ~map~
+1. Miscellany
+
+#+BEGIN_NOTES
+There will be a lot of code snippets in this talk.
+
+I will be asking a lot of questions.
+#+END_NOTES
+
+* Disclaimer
+
+I'm going to critique some code in this talk.
+
+If it's your code, please don't feel slighted.
+
+I assure you that I write and have written plenty of suboptimal code.
+
+Let's make code better together!
+
+* Preliminaries
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="https://godbolt.org/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.5479341055999998,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Implicit+value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A%7D%3B%0A%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:61.43386897404203,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((h:compiler,i:(compiler:clang_trunk,filters:(b:'0',binary:'1',commentOnly:'0',demangle:'0',directives:'0',execute:'1',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'x86-64+clang+(trunk)+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),k:38.56613102595797,l:'4',n:'0',o:'',s:0,t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
+
+#+BEGIN_NOTES
+You're going to see a lot of this later in the talk, when we examine how various
+snippets of code behave.
+#+END_NOTES
+
+* 1. What happens when we ~move~ something?
+#+BEGIN_SRC c++
+vector<int> v1 = {1, 2, 3, 4, 5};
+vector<int> v2 = move(v1);
+#+END_SRC
+
+What's in ~v1~ after the move?
+
+#+BEGIN_NOTES
+The standard says "valid but unspecified". We know that we're allowed to destroy
+it, because for things to be otherwise would be a nonsense. ~v1~ _will_ be
+destroyed like any other C++ object when it goes out of scope.
+
+Here's where we deviate from the standard. How is ~vector~ implemented,
+basically? (pointer-to-buffer, size, capacity). On destruction, what must it do?
+#+END_NOTES
+
+** A moved-from ~vector~
+It must be destroyable.
+
+What is sufficient? What is likely?
+ - begin pointer is null?
+ - size is zero?
+ - capacity is zero?
+
+** Exhibit A
+#+BEGIN_SRC c++
+void WebSocketHandshakerImpl::ProcessServerHandshake(HttpMessage message)
+{
+  // some stuff...
+
+  m_result.extra = blz::move(m_readBuffer);
+  m_result.headers = blz::move(message.headers);
+}
+#+END_SRC
+
+This code assumes that it's safe to do whatever comes later to a moved-from ~vector~.
+
+** Now consider:
+#+BEGIN_SRC c++
+string s1 = "Hello, world";
+string s2 = move(s1);
+#+END_SRC
+
+#+BEGIN_SRC c++
+string s1 = "Greetings, planet";
+string s2 = move(s1);
+#+END_SRC
+
+What's the moved-from state of ~s1~?
+
+#+BEGIN_NOTES
+What is the state of s1 in the second case? Same as the vector case basically.
+
+But the first example is small-string optimized. What happens when you move from
+a small string? You have to copy.
+
+What is the state of s1 in the first case? It happens that all major
+implementations (blz included) will set the size to zero on a move, even when in
+the small string buffer. So it's actually ever so slightly /slower/ than a copy.
+
+If you're lucky, the optimizer can help you out and spot dead stores...
+
+Bloomberg's STL does not clear a moved-from SSO string.
+#+END_NOTES
+
+** Observation
+Moving from a ~string~ usually /isn't any faster/ than copying from it.
+
+(If you doubt this, ask yourself why the small string optimization exists in the
+first place.)
+
+Moves /only/ matter for objects on the heap.
+
+http://quick-bench.com/GtvOqmK-eltAretuiNzQQEcBxdY
+
+#+BEGIN_NOTES
+And as noted, it may be technically slower.
+#+END_NOTES
+
+** Exhibit B
+#+BEGIN_SRC c++
+void Context::Trigger(/* some args */)
+{
+  // Make sure that it will trigger only once.
+  const OnResponseCallback cb = blz::move(m_responseCallback);
+
+  if (cb)
+  {
+    cb(errorCode, errorReason, payload, size, opaque);
+  }
+}
+#+END_SRC
+Is this comment telling the truth?
+
+#+BEGIN_NOTES
+Playing with fire. The comment is misleading. We're relying on implementation.
+
+Function has a small buffer optimization just like string. There's no reason for
+function to be null after a move.
+
+Think back to the vector case now: what happens if the container is replaced
+with a small-buffer optimizable container?
+#+END_NOTES
+
+** Guideline (specific)
+Don't assume things are empty after a ~move~.
+
+Use ~exchange~ to make sure. Assigning an empty object is a trivial price for
+safety.
+
+#+BEGIN_SRC c++
+m_result.extra = blz::exchange(m_readBuffer, {});
+
+const OnResponseCallback cb = blz::exchange(m_responseCallback, nullptr);
+#+END_SRC
+
+Make your code safe for future small-buffer optimizations.
+
+** Guideline (more general)
+If you didn't write the move constructor/operator yourself, after a ~move~, you
+may assume:
+
+ - the object is destroyable
+ - the object is (re-)assignable
+
+/NOTHING ELSE/
+
+Note: This is a stronger constraint than what the standard says.
+
+#+BEGIN_NOTES
+[defns.valid] "the object's invariants are met and operations on the object
+behave as specified for its type"
+
+The standard says you can call any function without preconditions.
+
+But I'm not saying anything that, I'm just saying something /more/ constrained,
+and safer.
+#+END_NOTES
+
+** Let's look at this again
+#+BEGIN_SRC c++
+void WebSocketHandshakerImpl::ProcessServerHandshake(HttpMessage message)
+{
+  // some stuff...
+
+  // which would be right here? this?
+  m_result.headers = blz::move(message.headers);
+
+  // or this?
+  m_result.headers = blz::move(message).headers;
+}
+#+END_SRC
+
+#+BEGIN_NOTES
+The first option is saying a much stronger thing. The result of ~move~ is always
+an rvalue reference. That's literally all ~move~ does: a cast to an rvalue
+reference.
+
+The second one is using C++ member access rules to infer the rvalue-ness of the
+member. That's fine. We still get the rvalue.
+
+The first one is saying "this is definitely an rvalue - trust me!".
+
+The second is saying "hey, this is an rvalue, unless something else prevents it".
+
+So what would "prevent it"?
+#+END_NOTES
+
+** There may be trouble ahead
+Let's say we want always want pretty much the same headers for all requests.
+
+What if we decided to change this...
+#+BEGIN_SRC c++
+struct HttpMessage
+{
+  blz::string requestLine;
+  Headers headers;
+};
+#+END_SRC
+...to this?
+#+BEGIN_SRC c++
+struct HttpMessage
+{
+  blz::string requestLine;
+  Headers& headers;
+};
+#+END_SRC
+
+#+BEGIN_NOTES
+What happens when we change ~Header~ to a reference?
+
+The HttpMessage itself can be an rvalue, but what it's referencing isn't.
+#+END_NOTES
+
+** Guideline
+Use ~move(obj).member~ rather than ~move(obj.member)~
+
+#+BEGIN_SRC c++
+// always safe, non-reference member is still an rvalue
+auto x = move(obj).member;
+
+// could erroneously move from an lvalue-ref!
+auto x = move(obj.member);
+#+END_SRC
+
+#+BEGIN_NOTES
+If we cast obj to an rvalue-ref, its member will also (usually) be an rvalue
+ref, no problem. We aren't losing anything and we're gaining safety.
+#+END_NOTES
+
+** ~move~ safety guidelines
+ - after ~move~, destroy or assign /only/
+ - use ~exchange~ to move-and-clear
+ - use ~move(obj).member~, not ~move(obj.member)~
+
+#+BEGIN_NOTES
+The last two points here are useful a lot of the time for writing move
+constructors. You're going to be working in terms of the subobjects.
+#+END_NOTES
+
+* 2. Copy Elision (RVO)
+
+What is the return value optimization?
+
+#+BEGIN_SRC c++
+string bar()
+{
+  string a{"Hi"};
+  int b = 42;
+  // ...
+  return a;
+}
+
+void foo()
+{
+  string s{bar()};
+}
+#+END_SRC
+
+#+BEGIN_NOTES
+The caller sets aside space in its own stack frame for the result of the
+function, and the callee constructs the result directly in that space.
+
+bar() has two local variables.
+
+when foo() calls bar() it "passes" the address of the stack variable s.
+#+END_NOTES
+
+** RVO in pictures: No RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./no-rvo1.svg]]
+
+** RVO in pictures: No RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./no-rvo2.svg]]
+
+** RVO in pictures: No RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./no-rvo3.svg]]
+
+** RVO in pictures: No RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./no-rvo4.svg]]
+
+** RVO in pictures: No RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./no-rvo5.svg]]
+
+** RVO in pictures: RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./rvo1.svg]]
+
+** RVO in pictures: RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./rvo2.svg]]
+
+** RVO in pictures: RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./rvo3.svg]]
+
+** RVO in pictures: RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./rvo4.svg]]
+
+** RVO in pictures: RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./rvo5.svg]]
+
+** When can RVO not apply?
+
+RVO Rules: what is returned has to be either:
+
+ - a temporary (prvalue)
+ - the name of a stack variable
+
+** When can RVO not apply?
+
+RVO Ability: sometimes, the callee /can't/ construct the object in-place.
+
+ - if there is no opportunity to
+ - if it's not of the right type
+ - if the callee doesn't know enough
+
+#+BEGIN_NOTES
+Function arguments that are passed to you already-constructed can't be RVOed on
+return. But you can move them.
+
+You have to know at construction time that you're going to be returning that
+variable in order to RVO it.
+#+END_NOTES
+
+** No RVO because no opportunity
+
+You can't RVO a variable if you didn't get the chance to construct it in the
+first place.
+#+BEGIN_SRC c++
+string sad_function(string s)
+{
+  s += "No RVO for you!";
+  return s;
+}
+#+END_SRC
+But the compiler will still move it. (Since C++11)
+
+#+BEGIN_NOTES
+C++11 mandates that if you can't do the RVO, you must try to move and only copy
+as a last resort.
+#+END_NOTES
+
+** No RVO because wrong type, 1
+
+An rvalue-ref is not the same type.
+#+BEGIN_SRC c++
+string sad_function()
+{
+  string s = "No RVO for you!";
+  return move(s);
+}
+#+END_SRC
+Don't ~return move(x)~ in most cases - you will get a move when you didn't need anything!
+
+#+BEGIN_NOTES
+There are legitimate cases for returning an rvalue reference.
+
+One of the few times when ~return move(x)~ is proper is when you're returning a
+member variable out of a rvalue-ref-qualified member function.
+#+END_NOTES
+
+** No RVO because wrong type, 2
+
+Factory functions can't RVO.
+#+BEGIN_SRC c++
+struct Base { ... };
+struct Derived : Base { ... };
+
+shared_ptr<Base> factory()
+{
+  return make_shared<Derived>();
+}
+#+END_SRC
+But will still move.
+
+#+BEGIN_NOTES
+This is also true of any types that are inter-convertible.
+e.g. returning a pair when the function returns a tuple, or something like that.
+#+END_NOTES
+
+** No RVO because not enough info
+
+It has to be decidable at construction time.
+#+BEGIN_SRC c++
+string undecided_function(double happiness)
+{
+  string happy = "Hooray";
+  string sad = "Boo hoo";
+
+  if (happiness > 0.5)
+    return happy;
+  else
+    return sad;
+}
+
+#+END_SRC
+Again, return value will still be moved.
+
+** Quiz time
+
+Wake up!
+
+And tell me if the upcoming code snippets will activate RVO.
+
+** Will it RVO?
+#+BEGIN_SRC c++
+const S will_it_rvo()
+{
+  return S{1};
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Yes.
+
+#+BEGIN_NOTES
+Yes. You're allowed to cv-qualify return types and RVO still works.
+
+But don't do this. The compiler ignores const-qualified builtin types anyway.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S will_it_rvo(bool b)
+{
+  if (b)
+    return S{1};
+  else
+    return S{0};
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Yes.
+
+#+BEGIN_NOTES
+Yes. This is URVO, and works pretty reliably even in debug builds.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S will_it_rvo(bool b, S s)
+{
+  if (b)
+    s = S{1};
+  return s;
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+No. (No opportunity.)
+
+#+BEGIN_NOTES
+No - can't RVO a function parameter. It will move though.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S get_S() { return S{1}; }
+
+S will_it_rvo(bool b)
+{
+  if (b)
+    return get_S();
+  return S{0};
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Yes. (Can RVO all the way down the callstack.)
+
+#+BEGIN_NOTES
+Yes. This RVOs.
+RVO is allowed to elide multiple copies.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S will_it_rvo(bool b)
+{
+  if (b)
+  {
+    S s{1};
+    return s;
+  }
+  return S{0};
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Yes (Clang), no (MSVC/GCC).
+
+#+BEGIN_NOTES
+There's nothing stopping it... but only Clang successfully RVO's this.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S will_it_rvo(bool b)
+{
+  S s{1};
+  if (b)
+    return s;
+  return S{0};
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+No. Possibly in future?
+
+#+BEGIN_NOTES
+We hoisted the S out of the condition.
+
+No RVO here (a sufficiently smart compiler might be able to...)
+
+It still moves.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S will_it_rvo(bool b)
+{
+  S s{1};
+  return b ? s : S{0};
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+No. (Against the rules.)
+
+#+BEGIN_NOTES
+No RVO. We're not naming a variable.
+Will it still move? No.
+
+We're not naming a variable. And it's not a prvalue - the conditional operator
+produces an lvalue reference here. We have to copy.
+
+This is perhaps a semi-common pattern that defeats RVO!
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S get_S() { return S{1}; }
+
+S will_it_rvo(bool b)
+{
+  return b ? get_S() : S{0};
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Yes. (Returning temporary.)
+
+#+BEGIN_NOTES
+This RVOs. This time the conditional operator produces a prvalue because both of
+its operands are prvalues.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S will_it_rvo()
+{
+  S s{1};
+  s = S{2};
+  return s;
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Yes.
+
+#+BEGIN_NOTES
+Yep. Plain NRVO.
+#+END_NOTES
+
+** Will it RVO?
+#+BEGIN_SRC c++
+S will_it_rvo()
+{
+  S s{1};
+  return (s);
+}
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Yes. Identifiers are allowed to be parenthesized in the ~return~ expression.
+
+#+BEGIN_NOTES
+The standard explicitly allows this.
+
+However... there seems to be a bug in GCC where it doesn't RVO this. MSVC does
+and Clang does.
+
+Technically GCC is still adhering to the standard, because it's not required to
+RVO. It does in C++11 mode, just not in C++14 or C++17 mode.
+#+END_NOTES
+
+** Exhibit C
+
+#+BEGIN_SRC c++
+unsigned long long Time() const override
+{
+  auto ts = blz::get<1>(blz::move(Base::metrics_->GetDataPointAndTime()));
+  return ts;
+}
+#+END_SRC
+
+Superfluous (potentially dangerous?) call to ~move~.
+
+NRVO is not guaranteed in debug mode. Better:
+
+#+BEGIN_SRC c++
+unsigned long long Time() const override
+{
+  return blz::get<1>(Base::metrics_->GetDataPointAndTime());
+}
+#+END_SRC
+
+#+BEGIN_NOTES
+Just an integral type here, so no big deal. But if it gets changed, or this
+pattern gets copied...
+#+END_NOTES
+
+** Guidelines for RVO-friendliness
+
+ - don't const-qualify returned value types
+ - almost never return ~move(x)~
+ - return temporaries where you can
+ - when you return named things, avoid conditions
+ - don't parenthesize return expressions
+
+#+BEGIN_NOTES
+First point does not affect RVO but is generally useless.
+
+URVO is easier for the compiler than NRVO. You are likely to get URVO in debug
+builds.
+
+Beware of the conditional operator.
+#+END_NOTES
+
+* 3. Putting stuff into a ~vector~
+Should you use ~push_back~ or should you use ~emplace_back~?
+
+How should you use them?
+
+** ~push_back~ and ~emplace_back~
+
+#+BEGIN_SRC c++
+void push_back(const T& x);
+void push_back(T&& x);
+
+template <class... Args>
+reference emplace_back(Args&&... args);
+#+END_SRC
+
+#+BEGIN_NOTES
+Until C++17, ~emplace_back~ returns ~void~.
+
+~blz~'s emplace_back returns a reference.
+#+END_NOTES
+
+** Example 1
+
+What's the difference here?
+
+#+BEGIN_SRC c++
+vector<string> v;
+string s;
+// ...
+
+v.push_back(move(s));
+v.emplace_back(move(s));
+#+END_SRC
+
+#+BEGIN_NOTES
+There is no difference.
+#+END_NOTES
+
+** Example 1.1
+
+What's the difference here?
+
+#+BEGIN_SRC c++
+vector<string> v;
+string s;
+// ...
+
+v.push_back(move(s));
+string& last_s = v.emplace_back(move(s));
+#+END_SRC
+
+#+BEGIN_NOTES
+If we want to capture a reference to the thing that was pushed, we can use
+~emplace_back~.
+#+END_NOTES
+
+** Example 2
+
+What's the difference here?
+
+#+BEGIN_SRC c++
+vector<string> v;
+const char* s = "Hello";
+// ...
+
+v.push_back(s);
+v.emplace_back(s);
+#+END_SRC
+
+#+BEGIN_NOTES
+~push_back~ constructs a temporary then moves it.
+
+~emplace_back~ constructs directly in place.
+
+Remember, for string, a move is usually as expensive as a copy.
+#+END_NOTES
+
+** Example 2.1
+
+Default in-place construct.
+
+#+BEGIN_SRC c++
+vector<S> v;
+
+// first default-construct in the vector
+S& s = v.emplace_back();
+
+// now mutate s
+// ...
+#+END_SRC
+
+~emplace_back~ takes a parameter pack. Parameter packs can be empty.
+
+#+BEGIN_NOTES
+~emplace_back~ is especially useful for this use case.
+#+END_NOTES
+
+** Example 3
+
+In-place construct with ~explicit~ constructor.
+
+#+BEGIN_SRC c++
+// recall: S has an explicit constructor from int
+vector<S> v;
+
+// push_back can't do explicit construction
+v.push_back(1);  // compiler error!
+
+// explicit construction is no problem for emplace_back
+S& s = v.emplace_back(1);
+#+END_SRC
+
+~emplace_back~ does perfect forwarding. It can call ~explicit~ constructors.
+
+#+BEGIN_NOTES
+~emplace_back~ is especially useful for this use case.
+#+END_NOTES
+
+** Example: copy
+Recall: our ~S~ class has a constructor from ~Foo~, and an ~explicit~ constructor
+from ~int~.
+
+#+BEGIN_SRC c++
+vector<S> v;
+array<Foo, N> a = { ... };
+v.reserve(a.size());
+
+copy(a.cbegin(), a.cend(), back_inserter(v));
+#+END_SRC
+
+What does ~back_insert_iterator~ do here?
+
+#+BEGIN_NOTES
+For each element, we construct an ~S~ (from the ~Foo~) and then we move it into
+the ~vector~.
+#+END_NOTES
+
+** Example : copy
+What if we have an ~array~ of ~int~?
+
+#+BEGIN_SRC c++
+vector<S> v;
+array<int, N> a = { ... };
+v.reserve(a.size());
+
+copy(a.cbegin(), a.cend(), back_inserter(v));
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+Oops. The compiler is angry at us.
+
+#+BEGIN_NOTES
+~back_insert_iterator~ calls ~push_back~ - it can't call our explicit
+constructor.
+#+END_NOTES
+
+** Example : copy?
+OK, no problem, right?
+
+#+BEGIN_SRC c++
+vector<S> v;
+array<int, N> a = { ... };
+v.reserve(a.size());
+
+transform(a.cbegin(), a.cend(), back_inserter(v),
+          [] (int i) { return S{i}; });
+#+END_SRC
+
+#+BEGIN_NOTES
+For each element, we construct an ~S~ (from the ~int~) and then we move it into
+the ~vector~. No extra cost over the first solution, because the ~return~ from the
+lambda RVOs.
+
+But what we actually want to do is construct in place.
+#+END_NOTES
+
+** ~back_emplacer~
+#+BEGIN_SRC c++
+template <typename Container>
+struct back_emplace_iterator
+{
+  explicit back_emplace_iterator(Container& c) : c(&c) {}
+
+  back_emplace_iterator& operator++() { return *this; }
+  back_emplace_iterator& operator*() { return *this; }
+
+  template <typename Arg>
+  back_emplace_iterator& operator=(Arg&& arg) {
+    c->emplace_back(forward<Arg>(arg));
+    return *this;
+  }
+
+private:
+  Container* c;
+};
+#+END_SRC
+
+** ~back_emplacer~
+#+BEGIN_SRC c++
+template <typename Container>
+auto back_emplacer(Container& c)
+{
+  return back_emplace_iterator<Container>(c);
+}
+#+END_SRC
+
+** ~back_emplacer~
+What if we have an ~array~ of ~int~?
+
+#+BEGIN_SRC c++
+vector<S> v;
+array<int, N> a = { ... };
+v.reserve(a.size());
+
+copy(a.cbegin(), a.cend(), back_emplacer(v));
+#+END_SRC
+
+Now it works. And constructs in place.
+
+** Exhibit D
+#+BEGIN_SRC c++
+blz::vector<blz::string_view> tokens;
+// ...
+blz::string_view token = /* stuff */;
+tokens.emplace_back(blz::move(token));
+#+END_SRC
+
+#+BEGIN_NOTES
+A few things here:
+ - ~string_view~ is a pointer + length. recommendation is to pass by value;
+   ~move~ gains nothing anyway.
+ - ~push_back~ works with rvalues just fine - ~emplace_back~ gains nothing here.
+ - if you want to, you should pass ~/* stuff */~ directly to ~emplace_back~.
+#+END_NOTES
+
+** Exhibit E
+
+#+BEGIN_SRC c++
+context->m_result->m_headers.emplace_back(string(headerData, numBytes));
+#+END_SRC
+
+A superfluous move! Better:
+
+#+BEGIN_SRC c++
+context->m_result->m_headers.emplace_back(headerData, numBytes);
+#+END_SRC
+
+Don't explicitly call a constructor with ~emplace_back~.
+
+#+BEGIN_NOTES
+And remember, likely a superfluous copy if the string is small-buffer-optimized.
+#+END_NOTES
+
+** ~vector~ of ~pair~ = ~map~
+Sometimes, we use a  sorted ~vector~ of ~pair~ as a replacement for ~map~.
+
+What do you do if part of your ~pair~ has a multi-argument constructor?
+
+#+BEGIN_SRC c++
+struct Foo { Foo(int, string, double); };
+
+vector<pair<int, Foo>> v;
+
+// this is very common!
+v.push_back(make_pair(1, Foo{42, "hello", 3.14}));
+
+// this is no better
+v.emplace_back(make_pair(1, Foo{42, "hello", 3.14}));
+
+// how can we do better?
+v.emplace_back( /* what here? */ );
+#+END_SRC
+
+** ~piecewise_construct~ to the rescue!
+
+~pair~ has a constructor that will handle your multi-argument constructor.
+
+#+BEGIN_SRC c++
+template <class... Args1, class... Args2>
+pair(piecewise_construct_t,
+     tuple<Args1...> first_args,
+     tuple<Args2...> second_args);
+
+template <class... Types>
+constexpr tuple<Types&&...> forward_as_tuple(Types&&... args) noexcept;
+#+END_SRC
+
+~piecewise_construct_t~ is a tag type.
+
+** Using ~piecewise_construct~
+#+BEGIN_SRC c++
+struct Foo { Foo(int, string, double); };
+
+vector<pair<int, Foo>> v;
+
+// instead of this...
+v.push_back(make_pair(1, Foo{42, "hello", 3.14}));
+
+// ...we can do this
+v.emplace_back(
+  make_pair(piecewise_construct,
+            forward_as_tuple(1),                   // args to int "constructor"
+            forward_as_tuple(42, "hello", 3.14))); // args to Foo constructor
+#+END_SRC
+Perfect forwarding and in-place construction.
+
+** Recommendations
+ - ~push_back~ is perfectly fine for rvalues
+ - use ~emplace_back~ only when you need its powers
+   - in-place construction (including nullary construction)
+   - a reference to what's added (C++17)
+ - never pass an explicit temporary to ~emplace_back~
+ - try to construct in place when you can
+ - use ~piecewise_construct~ / ~forward_as_tuple~ to forward args through ~pair~
+
+* 4. ~initializer_list~
+
+How does it work?
+
+What are its limits?
+
+** What is ~initializer_list~?
+When you write:
+#+BEGIN_SRC c++
+vector<int> v{ 1,2,3 };
+#+END_SRC
+It's as if you wrote:
+#+BEGIN_SRC c++
+const int a[] = { 1,2,3 };
+vector<int> v = initializer_list<int>(a, a+3);
+#+END_SRC
+
+#+BEGIN_NOTES
+Notice: the backing array is ~const~.
+#+END_NOTES
+
+** ~initializer_list~ has ~const~ storage, 1
+The compiler is free to locate that array elsewhere in memory.
+#+BEGIN_SRC c++
+auto f() (int i, int j, int k)
+{
+  return initializer_list<int>{ i,j,k };
+}
+#+END_SRC
+But it may not...
+#+BEGIN_SRC c++
+auto f() (int i, int j, int k)
+{
+  const int a[] = { i,j,k };
+  return initializer_list<int>(a, a+3);
+}
+#+END_SRC
+...and then you've returned a dangling reference.
+
+#+BEGIN_NOTES
+This is nasty, because it could work on one compiler and you wouldn't notice it.
+
+The compiler probably won't warn for this.
+
+~initializer_list~ is a "view" type like ~string_view~ and doesn't own its
+contents.
+#+END_NOTES
+
+** ~initializer_list~ has ~const~ storage, 2
+#+BEGIN_SRC c++
+unique_ptr<int> v = { make_unique<int>(1), make_unique<int>(2) };
+#+END_SRC
+That also means ~move~ can't work.
+#+BEGIN_SRC c++
+const unique_ptr<int> a[] = { make_unique<int>(1),
+                              make_unique<int>(2) };
+vector<unique_ptr<int>> v =
+  initializer_list<unique_ptr<int>>(a, a+3);
+#+END_SRC
+
+#+BEGIN_NOTES
+You can't move from an ~initializer_list~ - this won't compile.
+#+END_NOTES
+
+** But they're so convenient!
+I'd much rather write:
+
+#+BEGIN_SRC c++
+vector<S> v = { S{1}, S{2}, S{3} };
+#+END_SRC
+(3 constructs, 3 copies, 3 destructs)
+
+Than:
+#+BEGIN_SRC c++
+vector<S> v;
+v.reserve(3);
+v.emplace_back(1);
+v.emplace_back(2);
+v.emplace_back(3);
+#+END_SRC
+(3 constructs)
+
+#+BEGIN_NOTES
+The first version is probably OK for builtin primitive types.
+
+It's way worse than the second version for types with more than trivial
+construction.
+#+END_NOTES
+
+** We can make it a little better...
+
+#+BEGIN_SRC c++
+vector<S> v = { S{1}, S{2}, S{3} };
+#+END_SRC
+(3 constructs, 3 copies, 3 destructs)
+
+#+BEGIN_SRC c++
+S a[3] = { S{1}, S{2}, S{3} };
+vector<S> v(make_move_iterator(begin(a)),
+            make_move_iterator(end(a)));
+#+END_SRC
+(3 constructs, 3 moves, 3 destructs)
+
+** What we really need...
+
+Is an in-place constructor for ~vector~. (For everything?)
+
+#+BEGIN_SRC c++
+template <class... Args>
+explicit vector(in_place_t, Args&&... args);
+#+END_SRC
+
+Future (?) proposal by Simon Brand.
+
+https://wg21.tartanllama.xyz/initializer_list
+
+** Exhibit F
+#+BEGIN_SRC c++
+std::unordered_set<std::string> kKeywords = {
+	"alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
+	"bool", "break", "case", "catch", "char", "class", "compl", "const",
+	"constexpr", "const_cast", "continue", "decltype", "default", "delete", "do",
+	"double", "dynamic_cast", "else", "enum", "explicit", "extern", "false",
+	"float", "for", "friend", "goto", "if", "inline", "int", "long", "mutable",
+	"namespace", "new", "noexcept", "not", "not_eq", "NULL", "operator", "or",
+	"or_eq", "private", "protected", "public", "register", "reinterpret_cast",
+	"return", "short", "signed", "sizeof", "static", "static_assert",
+	"static_cast", "struct", "switch", "template", "this", "thread_local",
+	"throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned",
+	"using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
+};
+#+END_SRC
+
+** Caveat Constructor
+
+~string~ is an interesting case here. We intuit/are taught:
+
+#+REVEAL_HTML: <blockquote nil><p>Delay construction, allocation, etc. as late as possible.</p></blockquote>
+
+But that might hurt us with ~string~.
+
+[[https://www.youtube.com/watch?v=sSlmmZMFsXQ]["Initializer Lists are Broken, Let's Fix Them"]] -- Jason Turner, C++Now 2018
+
+#+BEGIN_NOTES
+Two things mess with our mental model for strings. First - the small buffer
+optimization. As previously mentioned, it makes copy the same cost as move.
+
+Second - we often make strings from string literals. What's the type of a string
+literal at declaration? Array of char. What's the type of it when you pass it to
+a function? It decays to pointer to char.
+
+So, if a string isn't small-buffer optimized, move is cheap. And if we're
+constructing it from a string literal, the compiler knows the size. If we let it
+decay to a char*, we're going to call strlen at some point.
+#+END_NOTES
+
+** Recommendations
+
+ - use ~initializer_list~ only for literal types
+ - consider using ~array~ and manually moving
+ - probably don't use ~initializer_list~ for anything that'll get run more than
+   once
+ - wait for an ~in_place_t~ constructor on ~vector~ ?
+ - watch Jason's talk
+
+#+BEGIN_NOTES
+I'm not sure what to recommend. Really the first point.
+#+END_NOTES
+
+* 5. Putting stuff into a ~map~
+
+It's a bit complicated.
+
+** Exhibit G
+
+#+BEGIN_SRC c++
+using Storage = unordered_set<ClientIdRecord>;
+Storage m_storage;
+m_storage.emplace(inClientId, process, romeoProcess);
+#+END_SRC
+
+Perfectly fine as far as ~emplace~ usage.
+
+Then we want to change the ~unordered_set~ to an ~unordered_map~.
+
+#+BEGIN_NOTES
+One in-place construct. This is fine.
+#+END_NOTES
+
+** Exhibit G
+
+#+BEGIN_SRC c++
+using Storage = unordered_map<string, ClientIdRecord>;
+Storage m_storage;
+m_storage.emplace(
+  make_pair(inClientId,
+            ClientIdRecord(inClientId, process, romeoProcess)));
+#+END_SRC
+
+2 extra moves.
+
+#+BEGIN_NOTES
+How do we do better?
+#+END_NOTES
+
+** Exhibit G
+
+#+BEGIN_SRC c++
+using Storage = unordered_map<string, ClientIdRecord>;
+Storage m_storage;
+m_storage.emplace(piecewise_construct,
+                  forward_as_tuple(inClientId),
+                  forward_as_tuple(inClientId, process, romeoProcess));
+#+END_SRC
+
+Use ~piecewise_construct~ again.
+
+* 6. Miscellany
+
+** Putting stuff into other things
+
+Like ~optional~, ~variant~, ~any~.
+
+#+BEGIN_SRC c++
+template <class... Args>
+constexpr explicit optional(std::in_place_t, Args&&... args);
+
+template <class T, class... Args>
+constexpr explicit variant(std::in_place_type_t<T>, Args&&... args);
+template <std::size_t I, class... Args>
+constexpr explicit variant(std::in_place_index_t<I>, Args&&... args);
+
+template <class ValueType, class... Args>
+explicit any(std::in_place_type_t<ValueType>, Args&&... args);
+#+END_SRC
