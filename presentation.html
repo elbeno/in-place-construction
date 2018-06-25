@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<title>Mastering Move Semantics</title>
+<title>Everyday Efficiency: In-place Construction</title>
 <meta name="author" content="(Ben Deane)"/>
 <style type="text/css">
 .underline { text-decoration: underline; }
@@ -27,19 +27,20 @@
 <body>
 <div class="reveal">
 <div class="slides">
-<section id="sec-title-slide"><h2>Mastering Move Semantics</h2><div class='vertspace2'></div><blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote><div class='vertspace3'></div><h3>Ben Deane / <a href="mailto:bdeane@blizzard.com">bdeane@blizzard.com</a> / <a href="http://twitter.com/ben_deane">@ben_deane</a></h3><h4>July 2018</h4>
+<section id="sec-title-slide"><h2>Everyday Efficiency: In-place Construction</h2><div class='vertspace2'></div><blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote><div class='vertspace3'></div><h3>Ben Deane / <a href="mailto:bdeane@blizzard.com">bdeane@blizzard.com</a> / <a href="http://twitter.com/ben_deane">@ben_deane</a></h3><h4>July 2018</h4>
 </section>
 
 <section>
-<section id="slide-org3e438db">
-<h2 id="org3e438db">Get Ready</h2>
+<section id="slide-org65affa8">
+<h2 id="org65affa8">Get Ready</h2>
 <ol>
 <li>What happens when we <code>move</code> something?</li>
 <li>Copy elision (RVO)</li>
 <li>Putting stuff into a <code>vector</code></li>
 <li><code>initializer_list</code></li>
 <li>Putting stuff into a <code>map</code></li>
-<li>Miscellany</li>
+<li>Putting stuff into other things</li>
+<li>Final thoughts</li>
 
 </ol>
 
@@ -57,8 +58,8 @@ I will be asking a lot of questions.
 </section>
 </section>
 <section>
-<section id="slide-orgf622d34">
-<h2 id="orgf622d34">Disclaimer</h2>
+<section id="slide-org17fab79">
+<h2 id="org17fab79">Disclaimer</h2>
 <p>
 I'm going to critique some code in this talk.
 </p>
@@ -78,8 +79,8 @@ Let's make code better together!
 </section>
 </section>
 <section>
-<section id="slide-org701d9f0">
-<h2 id="org701d9f0">Preliminaries</h2>
+<section id="slide-org5e569a7">
+<h2 id="org5e569a7">Preliminaries</h2>
 <iframe width="1400px" height="600px" src="https://godbolt.org/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.5479341055999998,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Implicit+value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A%7D%3B%0A%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:61.43386897404203,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((h:compiler,i:(compiler:clang_trunk,filters:(b:'0',binary:'1',commentOnly:'0',demangle:'0',directives:'0',execute:'1',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'x86-64+clang+(trunk)+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),k:38.56613102595797,l:'4',n:'0',o:'',s:0,t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 <aside class="notes">
@@ -93,8 +94,8 @@ snippets of code behave.
 </section>
 </section>
 <section>
-<section id="slide-orgc060188">
-<h2 id="orgc060188">1. What happens when we <code>move</code> something?</h2>
+<section id="slide-org1ae919e">
+<h2 id="org1ae919e">1. What happens when we <code>move</code> something?</h2>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">vector</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v1</span> = <span style="color: #707183;">{</span><span style="color: #008b8b;">1</span>, <span style="color: #008b8b;">2</span>, <span style="color: #008b8b;">3</span>, <span style="color: #008b8b;">4</span>, <span style="color: #008b8b;">5</span><span style="color: #707183;">}</span>;
@@ -121,8 +122,8 @@ basically? (pointer-to-buffer, size, capacity). On destruction, what must it do?
 </aside>
 
 </section>
-<section id="slide-org3e2a8d1">
-<h3 id="org3e2a8d1">A moved-from <code>vector</code></h3>
+<section id="slide-org20fa69c">
+<h3 id="org20fa69c">A moved-from <code>vector</code></h3>
 <p>
 It must be destroyable.
 </p>
@@ -138,8 +139,8 @@ What is sufficient? What is likely?
 </ul>
 
 </section>
-<section id="slide-org97e1311">
-<h3 id="org97e1311">Exhibit A</h3>
+<section id="slide-org936584d">
+<h3 id="org936584d">Exhibit A</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #008b8b;">WebSocketHandshakerImpl</span>::<span style="color: #0000ff;">ProcessServerHandshake</span><span style="color: #707183;">(</span><span style="color: #228b22;">HttpMessage</span> <span style="color: #a0522d;">message</span><span style="color: #707183;">)</span>
@@ -157,8 +158,8 @@ This code assumes that it's safe to do whatever comes later to a moved-from <cod
 </p>
 
 </section>
-<section id="slide-org7295035">
-<h3 id="org7295035">Now consider:</h3>
+<section id="slide-orgd6d0291">
+<h3 id="orgd6d0291">Now consider:</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">string</span> <span style="color: #a0522d;">s1</span> = <span style="color: #b22222;">"Hello, world"</span>;
@@ -204,8 +205,8 @@ Bloomberg's STL does not clear a moved-from SSO string.
 </aside>
 
 </section>
-<section id="slide-orgc300cfd">
-<h3 id="orgc300cfd">Observation</h3>
+<section id="slide-org726e704">
+<h3 id="org726e704">Observation</h3>
 <p>
 Moving from a <code>string</code> usually <i>isn't any faster</i> than copying from it.
 </p>
@@ -231,8 +232,8 @@ And as noted, it may be technically slower.
 </aside>
 
 </section>
-<section id="slide-orgae6059d">
-<h3 id="orgae6059d">Exhibit B</h3>
+<section id="slide-org4dc43aa">
+<h3 id="org4dc43aa">Exhibit B</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #008b8b;">Context</span>::<span style="color: #0000ff;">Trigger</span><span style="color: #707183;">(</span><span style="color: #006400;">/* </span><span style="color: #006400;">some args */</span><span style="color: #707183;">)</span>
@@ -269,8 +270,8 @@ with a small-buffer optimizable container?
 </aside>
 
 </section>
-<section id="slide-orgb4f355e">
-<h3 id="orgb4f355e">Guideline (specific)</h3>
+<section id="slide-org60c9d53">
+<h3 id="org60c9d53">Guideline (specific)</h3>
 <p>
 Don't assume things are empty after a <code>move</code>.
 </p>
@@ -293,8 +294,8 @@ Make your code safe for future small-buffer optimizations.
 </p>
 
 </section>
-<section id="slide-org0f5074a">
-<h3 id="org0f5074a">Guideline (more general)</h3>
+<section id="slide-org012f46d">
+<h3 id="org012f46d">Guideline (more general)</h3>
 <p>
 If you didn't write the move constructor/operator yourself, after a <code>move</code>, you
 may assume:
@@ -332,8 +333,8 @@ and safer.
 </aside>
 
 </section>
-<section id="slide-orgd329ab6">
-<h3 id="orgd329ab6">Let's look at this again</h3>
+<section id="slide-org7386f70">
+<h3 id="org7386f70">Let's look at this again</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #008b8b;">WebSocketHandshakerImpl</span>::<span style="color: #0000ff;">ProcessServerHandshake</span><span style="color: #707183;">(</span><span style="color: #228b22;">HttpMessage</span> <span style="color: #a0522d;">message</span><span style="color: #707183;">)</span>
@@ -376,8 +377,8 @@ So what would "prevent it"?
 </aside>
 
 </section>
-<section id="slide-orgcbe496e">
-<h3 id="orgcbe496e">There may be trouble ahead</h3>
+<section id="slide-org0953982">
+<h3 id="org0953982">There may be trouble ahead</h3>
 <p>
 Let's say we want always want pretty much the same headers for all requests.
 </p>
@@ -419,8 +420,8 @@ The HttpMessage itself can be an rvalue, but what it's referencing isn't.
 </aside>
 
 </section>
-<section id="slide-orgb38a29d">
-<h3 id="orgb38a29d">Guideline</h3>
+<section id="slide-org03616a3">
+<h3 id="org03616a3">Guideline</h3>
 <p>
 Use <code>move(obj).member</code> rather than <code>move(obj.member)</code>
 </p>
@@ -444,8 +445,8 @@ ref, no problem. We aren't losing anything and we're gaining safety.
 </aside>
 
 </section>
-<section id="slide-org67f2fcc">
-<h3 id="org67f2fcc"><code>move</code> safety guidelines</h3>
+<section id="slide-org48bf1fd">
+<h3 id="org48bf1fd"><code>move</code> safety guidelines</h3>
 <ul>
 <li>after <code>move</code>, destroy or assign <i>only</i></li>
 <li>use <code>exchange</code> to move-and-clear</li>
@@ -464,8 +465,8 @@ constructors. You're going to be working in terms of the subobjects.
 </section>
 </section>
 <section>
-<section id="slide-org0948e61">
-<h2 id="org0948e61">2. Copy Elision (RVO)</h2>
+<section id="slide-org9645816">
+<h2 id="org9645816">2. Copy Elision (RVO)</h2>
 <p>
 What is the return value optimization?
 </p>
@@ -504,8 +505,8 @@ when foo() calls bar() it "passes" the address of the stack variable s.
 </aside>
 
 </section>
-<section id="slide-org7fd0489">
-<h3 id="org7fd0489">RVO in pictures: No RVO</h3>
+<section id="slide-org2c2f084">
+<h3 id="org2c2f084">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -515,8 +516,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org7d43a2d">
-<h3 id="org7d43a2d">RVO in pictures: No RVO</h3>
+<section id="slide-org451ec04">
+<h3 id="org451ec04">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -526,8 +527,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orgb321c03">
-<h3 id="orgb321c03">RVO in pictures: No RVO</h3>
+<section id="slide-orgbe28542">
+<h3 id="orgbe28542">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -537,8 +538,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orgf030dd8">
-<h3 id="orgf030dd8">RVO in pictures: No RVO</h3>
+<section id="slide-orgcbeb16a">
+<h3 id="orgcbeb16a">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -548,8 +549,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org4d393eb">
-<h3 id="org4d393eb">RVO in pictures: No RVO</h3>
+<section id="slide-orgd9db599">
+<h3 id="orgd9db599">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -559,8 +560,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orgfe20818">
-<h3 id="orgfe20818">RVO in pictures: RVO</h3>
+<section id="slide-org26c3342">
+<h3 id="org26c3342">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -570,8 +571,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orgf3ea1e0">
-<h3 id="orgf3ea1e0">RVO in pictures: RVO</h3>
+<section id="slide-orgba1fa14">
+<h3 id="orgba1fa14">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -581,8 +582,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orgd75cf03">
-<h3 id="orgd75cf03">RVO in pictures: RVO</h3>
+<section id="slide-orgb1bfbaa">
+<h3 id="orgb1bfbaa">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -592,8 +593,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org3f3933b">
-<h3 id="org3f3933b">RVO in pictures: RVO</h3>
+<section id="slide-orgd6c4b1f">
+<h3 id="orgd6c4b1f">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -603,8 +604,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org6702cbb">
-<h3 id="org6702cbb">RVO in pictures: RVO</h3>
+<section id="slide-orgf9cf055">
+<h3 id="orgf9cf055">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -614,8 +615,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org561de1d">
-<h3 id="org561de1d">When can RVO not apply?</h3>
+<section id="slide-org6083823">
+<h3 id="org6083823">When can RVO not apply?</h3>
 <p>
 RVO Rules: what is returned has to be either:
 </p>
@@ -627,8 +628,8 @@ RVO Rules: what is returned has to be either:
 </ul>
 
 </section>
-<section id="slide-org787b586">
-<h3 id="org787b586">When can RVO not apply?</h3>
+<section id="slide-org3affefc">
+<h3 id="org3affefc">When can RVO not apply?</h3>
 <p>
 RVO Ability: sometimes, the callee <i>can't</i> construct the object in-place.
 </p>
@@ -654,8 +655,8 @@ variable in order to RVO it.
 </aside>
 
 </section>
-<section id="slide-orgac584b1">
-<h3 id="orgac584b1">No RVO because no opportunity</h3>
+<section id="slide-orgee66edc">
+<h3 id="orgee66edc">No RVO because no opportunity</h3>
 <p>
 You can't RVO a variable if you didn't get the chance to construct it in the
 first place.
@@ -682,8 +683,8 @@ as a last resort.
 </aside>
 
 </section>
-<section id="slide-org8e0a1b4">
-<h3 id="org8e0a1b4">No RVO because wrong type, 1</h3>
+<section id="slide-orgcfcc730">
+<h3 id="orgcfcc730">No RVO because wrong type, 1</h3>
 <p>
 An rvalue-ref is not the same type.
 </p>
@@ -713,8 +714,8 @@ member variable out of a rvalue-ref-qualified member function.
 </aside>
 
 </section>
-<section id="slide-org58a3fdd">
-<h3 id="org58a3fdd">No RVO because wrong type, 2</h3>
+<section id="slide-org82ea856">
+<h3 id="org82ea856">No RVO because wrong type, 2</h3>
 <p>
 Factory functions can't RVO.
 </p>
@@ -742,19 +743,19 @@ e.g. returning a pair when the function returns a tuple, or something like that.
 </aside>
 
 </section>
-<section id="slide-org0bec414">
-<h3 id="org0bec414">No RVO because not enough info</h3>
+<section id="slide-org7038cd4">
+<h3 id="org7038cd4">No RVO because not enough info</h3>
 <p>
 It has to be decidable at construction time.
 </p>
 <div class="org-src-container">
 
-<pre  class="src src-c++"><span style="color: #228b22;">string</span> <span style="color: #0000ff;">undecided_function</span><span style="color: #707183;">(</span><span style="color: #228b22;">double</span> <span style="color: #a0522d;">happiness</span><span style="color: #707183;">)</span>
+<pre  class="src src-c++"><span style="color: #228b22;">string</span> <span style="color: #0000ff;">undecided_function</span><span style="color: #707183;">()</span>
 <span style="color: #707183;">{</span>
   <span style="color: #228b22;">string</span> <span style="color: #a0522d;">happy</span> = <span style="color: #b22222;">"Hooray"</span>;
   <span style="color: #228b22;">string</span> <span style="color: #a0522d;">sad</span> = <span style="color: #b22222;">"Boo hoo"</span>;
 
-  <span style="color: #a020f0;">if</span> <span style="color: #7388d6;">(</span>happiness &gt; <span style="color: #008b8b;">0.5</span><span style="color: #7388d6;">)</span>
+  <span style="color: #a020f0;">if</span> <span style="color: #7388d6;">(</span>getHappiness<span style="color: #909183;">()</span> &gt; <span style="color: #008b8b;">0.5</span><span style="color: #7388d6;">)</span>
     <span style="color: #a020f0;">return</span> happy;
   <span style="color: #a020f0;">else</span>
     <span style="color: #a020f0;">return</span> sad;
@@ -767,8 +768,8 @@ Again, return value will still be moved.
 </p>
 
 </section>
-<section id="slide-org188b8f1">
-<h3 id="org188b8f1">Quiz time</h3>
+<section id="slide-orgcb0fbad">
+<h3 id="orgcb0fbad">Quiz time</h3>
 <p>
 Wake up!
 </p>
@@ -778,8 +779,8 @@ And tell me if the upcoming code snippets will activate RVO.
 </p>
 
 </section>
-<section id="slide-org5421e81">
-<h3 id="org5421e81">Will it RVO?</h3>
+<section id="slide-org72af58c">
+<h3 id="org72af58c">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">const</span> <span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">()</span>
@@ -805,8 +806,8 @@ But don't do this. The compiler ignores const-qualified builtin types anyway.
 </aside>
 
 </section>
-<section id="slide-org7e68936">
-<h3 id="org7e68936">Will it RVO?</h3>
+<section id="slide-org5c284d8">
+<h3 id="org5c284d8">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -831,8 +832,8 @@ Yes. This is URVO, and works pretty reliably even in debug builds.
 </aside>
 
 </section>
-<section id="slide-org2152b81">
-<h3 id="org2152b81">Will it RVO?</h3>
+<section id="slide-org2ba5a95">
+<h3 id="org2ba5a95">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span>, <span style="color: #228b22;">S</span> <span style="color: #a0522d;">s</span><span style="color: #707183;">)</span>
@@ -856,8 +857,8 @@ No - can't RVO a function parameter. It will move though.
 </aside>
 
 </section>
-<section id="slide-org98a0720">
-<h3 id="org98a0720">Will it RVO?</h3>
+<section id="slide-org775958b">
+<h3 id="org775958b">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">get_S</span><span style="color: #707183;">()</span> <span style="color: #707183;">{</span> <span style="color: #a020f0;">return</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>; <span style="color: #707183;">}</span>
@@ -884,8 +885,8 @@ RVO is allowed to elide multiple copies.
 </aside>
 
 </section>
-<section id="slide-orgee8326d">
-<h3 id="orgee8326d">Will it RVO?</h3>
+<section id="slide-org3f3a094">
+<h3 id="org3f3a094">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -912,8 +913,8 @@ There's nothing stopping it&#x2026; but only Clang successfully RVO's this.
 </aside>
 
 </section>
-<section id="slide-org9a9fc39">
-<h3 id="org9a9fc39">Will it RVO?</h3>
+<section id="slide-org064162d">
+<h3 id="org064162d">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -946,8 +947,8 @@ It still moves.
 </aside>
 
 </section>
-<section id="slide-org539417a">
-<h3 id="org539417a">Will it RVO?</h3>
+<section id="slide-org6f9610a">
+<h3 id="org6f9610a">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -980,8 +981,8 @@ This is perhaps a semi-common pattern that defeats RVO!
 </aside>
 
 </section>
-<section id="slide-org43bc708">
-<h3 id="org43bc708">Will it RVO?</h3>
+<section id="slide-org2e43c3e">
+<h3 id="org2e43c3e">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">get_S</span><span style="color: #707183;">()</span> <span style="color: #707183;">{</span> <span style="color: #a020f0;">return</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>; <span style="color: #707183;">}</span>
@@ -1006,8 +1007,8 @@ its operands are prvalues.
 </aside>
 
 </section>
-<section id="slide-orgb22cf11">
-<h3 id="orgb22cf11">Will it RVO?</h3>
+<section id="slide-orgacbb198">
+<h3 id="orgacbb198">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">()</span>
@@ -1031,8 +1032,8 @@ Yep. Plain NRVO.
 </aside>
 
 </section>
-<section id="slide-org3489555">
-<h3 id="org3489555">Will it RVO?</h3>
+<section id="slide-orgef926d2">
+<h3 id="orgef926d2">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">()</span>
@@ -1065,8 +1066,8 @@ RVO. It does in C++11 mode, just not in C++14 or C++17 mode.
 </aside>
 
 </section>
-<section id="slide-orgab692fd">
-<h3 id="orgab692fd">Exhibit C</h3>
+<section id="slide-org24b65a9">
+<h3 id="org24b65a9">Exhibit C</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">unsigned</span> <span style="color: #228b22;">long</span> <span style="color: #228b22;">long</span> <span style="color: #0000ff;">Time</span><span style="color: #707183;">()</span> <span style="color: #a020f0;">const</span> <span style="color: #a020f0;">override</span>
@@ -1103,8 +1104,8 @@ pattern gets copied&#x2026;
 </aside>
 
 </section>
-<section id="slide-org57191a9">
-<h3 id="org57191a9">Guidelines for RVO-friendliness</h3>
+<section id="slide-orgd592871">
+<h3 id="orgd592871">Guidelines for RVO-friendliness</h3>
 <ul>
 <li>don't const-qualify returned value types</li>
 <li>almost never return <code>move(x)</code></li>
@@ -1133,8 +1134,8 @@ Beware of the conditional operator.
 </section>
 </section>
 <section>
-<section id="slide-org415e4bd">
-<h2 id="org415e4bd">3. Putting stuff into a <code>vector</code></h2>
+<section id="slide-org6ab2a3e">
+<h2 id="org6ab2a3e">3. Putting stuff into a <code>vector</code></h2>
 <p>
 Should you use <code>push_back</code> or should you use <code>emplace_back</code>?
 </p>
@@ -1144,8 +1145,8 @@ How should you use them?
 </p>
 
 </section>
-<section id="slide-org5f4f35d">
-<h3 id="org5f4f35d"><code>push_back</code> and <code>emplace_back</code></h3>
+<section id="slide-org4074f53">
+<h3 id="org4074f53"><code>push_back</code> and <code>emplace_back</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #0000ff;">push_back</span><span style="color: #707183;">(</span><span style="color: #a020f0;">const</span> <span style="color: #228b22;">T</span>&amp; <span style="color: #a0522d;">x</span><span style="color: #707183;">)</span>;
@@ -1168,8 +1169,8 @@ Until C++17, <code>emplace_back</code> returns <code>void</code>.
 </aside>
 
 </section>
-<section id="slide-org69f7499">
-<h3 id="org69f7499">Example 1</h3>
+<section id="slide-orgcf1c858">
+<h3 id="orgcf1c858">Example 1</h3>
 <p>
 What's the difference here?
 </p>
@@ -1193,8 +1194,8 @@ There is no difference.
 </aside>
 
 </section>
-<section id="slide-orga3f1ca2">
-<h3 id="orga3f1ca2">Example 1.1</h3>
+<section id="slide-orgb2a07bd">
+<h3 id="orgb2a07bd">Example 1.1</h3>
 <p>
 What's the difference here?
 </p>
@@ -1219,8 +1220,8 @@ If we want to capture a reference to the thing that was pushed, we can use
 </aside>
 
 </section>
-<section id="slide-org69f17fd">
-<h3 id="org69f17fd">Example 2</h3>
+<section id="slide-org68573fb">
+<h3 id="org68573fb">Example 2</h3>
 <p>
 What's the difference here?
 </p>
@@ -1252,8 +1253,8 @@ Remember, for string, a move is usually as expensive as a copy.
 </aside>
 
 </section>
-<section id="slide-org800b443">
-<h3 id="org800b443">Example 2.1</h3>
+<section id="slide-orgb5b0058">
+<h3 id="orgb5b0058">Example 2.1</h3>
 <p>
 Default in-place construct.
 </p>
@@ -1282,8 +1283,8 @@ Default in-place construct.
 </aside>
 
 </section>
-<section id="slide-orgdbdfb21">
-<h3 id="orgdbdfb21">Example 3</h3>
+<section id="slide-orgd38b2db">
+<h3 id="orgd38b2db">Example 3</h3>
 <p>
 In-place construct with <code>explicit</code> constructor.
 </p>
@@ -1313,8 +1314,8 @@ v.push_back<span style="color: #707183;">(</span><span style="color: #008b8b;">1
 </aside>
 
 </section>
-<section id="slide-orgd7ddc41">
-<h3 id="orgd7ddc41">Example: copy</h3>
+<section id="slide-orgb847ab7">
+<h3 id="orgb847ab7">Example: copy</h3>
 <p>
 Recall: our <code>S</code> class has a constructor from <code>Foo</code>, and an <code>explicit</code> constructor
 from <code>int</code>.
@@ -1343,8 +1344,8 @@ the <code>vector</code>.
 </aside>
 
 </section>
-<section id="slide-org07e1aa2">
-<h3 id="org07e1aa2">Example : copy</h3>
+<section id="slide-org43e85c9">
+<h3 id="org43e85c9">Example: copy</h3>
 <p>
 What if we have an <code>array</code> of <code>int</code>?
 </p>
@@ -1372,8 +1373,8 @@ constructor.
 </aside>
 
 </section>
-<section id="slide-orgdf602af">
-<h3 id="orgdf602af">Example : copy?</h3>
+<section id="slide-org70bfaf4">
+<h3 id="org70bfaf4">Example: copy?</h3>
 <p>
 OK, no problem, right?
 </p>
@@ -1403,8 +1404,8 @@ But what we actually want to do is construct in place.
 </aside>
 
 </section>
-<section id="slide-orgc9dc9bb">
-<h3 id="orgc9dc9bb"><code>back_emplacer</code></h3>
+<section id="slide-org4900b43">
+<h3 id="org4900b43"><code>back_emplacer</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">Container</span><span style="color: #707183;">&gt;</span>
@@ -1428,8 +1429,8 @@ But what we actually want to do is construct in place.
 </div>
 
 </section>
-<section id="slide-org148a080">
-<h3 id="org148a080"><code>back_emplacer</code></h3>
+<section id="slide-org79017a7">
+<h3 id="org79017a7"><code>back_emplacer</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">Container</span><span style="color: #707183;">&gt;</span>
@@ -1441,8 +1442,8 @@ But what we actually want to do is construct in place.
 </div>
 
 </section>
-<section id="slide-org0e2c3dd">
-<h3 id="org0e2c3dd"><code>back_emplacer</code></h3>
+<section id="slide-orgac93a07">
+<h3 id="orgac93a07"><code>back_emplacer</code></h3>
 <p>
 What if we have an <code>array</code> of <code>int</code>?
 </p>
@@ -1462,8 +1463,8 @@ Now it works. And constructs in place.
 </p>
 
 </section>
-<section id="slide-orgecf2108">
-<h3 id="orgecf2108">Exhibit D</h3>
+<section id="slide-org1786673">
+<h3 id="org1786673">Exhibit D</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #008b8b;">blz</span>::<span style="color: #228b22;">vector</span><span style="color: #707183;">&lt;</span><span style="color: #008b8b;">blz</span>::string_view<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">tokens</span>;
@@ -1488,8 +1489,8 @@ A few things here:
 </aside>
 
 </section>
-<section id="slide-org39f0e69">
-<h3 id="org39f0e69">Exhibit E</h3>
+<section id="slide-org96c95be">
+<h3 id="org96c95be">Exhibit E</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++">context-&gt;m_result-&gt;m_headers.emplace_back<span style="color: #707183;">(</span>string<span style="color: #7388d6;">(</span>headerData, numBytes<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
@@ -1518,8 +1519,8 @@ And remember, likely a superfluous copy if the string is small-buffer-optimized.
 </aside>
 
 </section>
-<section id="slide-orga758b69">
-<h3 id="orga758b69"><code>vector</code> of <code>pair</code> = <code>map</code></h3>
+<section id="slide-org1498fc0">
+<h3 id="org1498fc0"><code>vector</code> of <code>pair</code> = <code>map</code></h3>
 <p>
 Sometimes, we use a  sorted <code>vector</code> of <code>pair</code> as a replacement for <code>map</code>.
 </p>
@@ -1546,8 +1547,8 @@ v.emplace_back<span style="color: #707183;">(</span> <span style="color: #006400
 </div>
 
 </section>
-<section id="slide-orgdd8797f">
-<h3 id="orgdd8797f"><code>piecewise_construct</code> to the rescue!</h3>
+<section id="slide-org3744240">
+<h3 id="org3744240"><code>piecewise_construct</code> to the rescue!</h3>
 <p>
 <code>pair</code> has a constructor that will handle your multi-argument constructor.
 </p>
@@ -1569,8 +1570,8 @@ v.emplace_back<span style="color: #707183;">(</span> <span style="color: #006400
 </p>
 
 </section>
-<section id="slide-org2354527">
-<h3 id="org2354527">Using <code>piecewise_construct</code></h3>
+<section id="slide-orge73e30b">
+<h3 id="orge73e30b">Using <code>piecewise_construct</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">struct</span> <span style="color: #228b22;">Foo</span> <span style="color: #707183;">{</span> <span style="color: #0000ff;">Foo</span><span style="color: #7388d6;">(</span><span style="color: #228b22;">int</span>, <span style="color: #228b22;">string</span>, <span style="color: #228b22;">double</span><span style="color: #7388d6;">)</span>; <span style="color: #707183;">}</span>;
@@ -1592,8 +1593,8 @@ Perfect forwarding and in-place construction.
 </p>
 
 </section>
-<section id="slide-org2934182">
-<h3 id="org2934182">Recommendations</h3>
+<section id="slide-org323c213">
+<h3 id="org323c213">Recommendations</h3>
 <ul>
 <li><code>push_back</code> is perfectly fine for rvalues</li>
 <li>use <code>emplace_back</code> only when you need its powers
@@ -1611,8 +1612,8 @@ Perfect forwarding and in-place construction.
 </section>
 </section>
 <section>
-<section id="slide-org73c146e">
-<h2 id="org73c146e">4. <code>initializer_list</code></h2>
+<section id="slide-org3ddfb57">
+<h2 id="org3ddfb57">4. <code>initializer_list</code></h2>
 <p>
 How does it work?
 </p>
@@ -1622,8 +1623,8 @@ What are its limits?
 </p>
 
 </section>
-<section id="slide-org322c738">
-<h3 id="org322c738">What is <code>initializer_list</code>?</h3>
+<section id="slide-orgde57c0a">
+<h3 id="orgde57c0a">What is <code>initializer_list</code>?</h3>
 <p>
 When you write:
 </p>
@@ -1650,8 +1651,8 @@ Notice: the backing array is <code>const</code>.
 </aside>
 
 </section>
-<section id="slide-orgdea31b5">
-<h3 id="orgdea31b5"><code>initializer_list</code> has <code>const</code> storage, 1</h3>
+<section id="slide-orgcceaf28">
+<h3 id="orgcceaf28"><code>initializer_list</code> has <code>const</code> storage, 1</h3>
 <p>
 The compiler is free to locate that array elsewhere in memory.
 </p>
@@ -1696,8 +1697,8 @@ contents.
 </aside>
 
 </section>
-<section id="slide-orgc8b3cf0">
-<h3 id="orgc8b3cf0"><code>initializer_list</code> has <code>const</code> storage, 2</h3>
+<section id="slide-org71cbe24">
+<h3 id="org71cbe24"><code>initializer_list</code> has <code>const</code> storage, 2</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">unique_ptr</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = <span style="color: #707183;">{</span> make_unique<span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #7388d6;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">)</span>, make_unique<span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #7388d6;">&gt;(</span><span style="color: #008b8b;">2</span><span style="color: #7388d6;">)</span> <span style="color: #707183;">}</span>;
@@ -1723,8 +1724,8 @@ You can't move from an <code>initializer_list</code> - this won't compile.
 </aside>
 
 </section>
-<section id="slide-org926dcf7">
-<h3 id="org926dcf7">But they're so convenient!</h3>
+<section id="slide-org1676151">
+<h3 id="org1676151">But they're so convenient!</h3>
 <p>
 I'd much rather write:
 </p>
@@ -1767,8 +1768,8 @@ construction.
 </aside>
 
 </section>
-<section id="slide-orgd4e6c2c">
-<h3 id="orgd4e6c2c">We can make it a little better&#x2026;</h3>
+<section id="slide-orgf59a421">
+<h3 id="orgf59a421">We can make it a little better&#x2026;</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">vector</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = <span style="color: #707183;">{</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>, S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">2</span><span style="color: #7388d6;">}</span>, S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">3</span><span style="color: #7388d6;">}</span> <span style="color: #707183;">}</span>;
@@ -1790,8 +1791,8 @@ construction.
 </p>
 
 </section>
-<section id="slide-orgf2e5842">
-<h3 id="orgf2e5842">What we really need&#x2026;</h3>
+<section id="slide-org9862bd8">
+<h3 id="org9862bd8">What we really need&#x2026;</h3>
 <p>
 Is an in-place constructor for <code>vector</code>. (For everything?)
 </p>
@@ -1812,11 +1813,11 @@ Future (?) proposal by Simon Brand.
 </p>
 
 </section>
-<section id="slide-org94c0f4d">
-<h3 id="org94c0f4d">Exhibit F</h3>
+<section id="slide-org5932f01">
+<h3 id="org5932f01">Exhibit F</h3>
 <div class="org-src-container">
 
-<pre  class="src src-c++"><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">unordered_set</span><span style="color: #707183;">&lt;</span><span style="color: #008b8b;">std</span>::string<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">kKeywords</span> = <span style="color: #707183;">{</span>
+<pre  class="src src-c++"><span style="color: #228b22;">unordered_set</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">string</span><span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">kKeywords</span> = <span style="color: #707183;">{</span>
         <span style="color: #b22222;">"alignas"</span>, <span style="color: #b22222;">"alignof"</span>, <span style="color: #b22222;">"and"</span>, <span style="color: #b22222;">"and_eq"</span>, <span style="color: #b22222;">"asm"</span>, <span style="color: #b22222;">"auto"</span>, <span style="color: #b22222;">"bitand"</span>, <span style="color: #b22222;">"bitor"</span>,
         <span style="color: #b22222;">"bool"</span>, <span style="color: #b22222;">"break"</span>, <span style="color: #b22222;">"case"</span>, <span style="color: #b22222;">"catch"</span>, <span style="color: #b22222;">"char"</span>, <span style="color: #b22222;">"class"</span>, <span style="color: #b22222;">"compl"</span>, <span style="color: #b22222;">"const"</span>,
         <span style="color: #b22222;">"constexpr"</span>, <span style="color: #b22222;">"const_cast"</span>, <span style="color: #b22222;">"continue"</span>, <span style="color: #b22222;">"decltype"</span>, <span style="color: #b22222;">"default"</span>, <span style="color: #b22222;">"delete"</span>, <span style="color: #b22222;">"do"</span>,
@@ -1833,8 +1834,8 @@ Future (?) proposal by Simon Brand.
 </div>
 
 </section>
-<section id="slide-org8d9a861">
-<h3 id="org8d9a861">Caveat Constructor</h3>
+<section id="slide-orgbc41e21">
+<h3 id="orgbc41e21">Caveat Constructor</h3>
 <p>
 <code>string</code> is an interesting case here. We intuit/are taught:
 </p>
@@ -1847,6 +1848,24 @@ But that might hurt us with <code>string</code>.
 
 <p>
 <a href="https://www.youtube.com/watch?v=sSlmmZMFsXQ">"Initializer Lists are Broken, Let's Fix Them"</a> &#x2013; Jason Turner, C++Now 2018
+</p>
+
+</section>
+<section id="slide-orgfcb21df">
+<h3 id="orgfcb21df">Surprising: <code>string</code> vs <code>const char*</code></h3>
+<p>
+SBO-strings
+<a href="http://quick-bench.com/5dPSX8rx-R8_BIUYbYOp6DcqhAc">http://quick-bench.com/5dPSX8rx-R8_BIUYbYOp6DcqhAc</a>
+</p>
+
+<p>
+Non SBO-strings 1:
+<a href="http://quick-bench.com/mr6ZIQ8Jy0ghe1scBcTznYF2s5w">http://quick-bench.com/mr6ZIQ8Jy0ghe1scBcTznYF2s5w</a>
+</p>
+
+<p>
+Non SBO-strings 2:
+<a href="http://quick-bench.com/vzlG11LwZN-uMAKdK8X1XgRuaWs">http://quick-bench.com/vzlG11LwZN-uMAKdK8X1XgRuaWs</a>
 </p>
 
 <aside class="notes">
@@ -1870,8 +1889,8 @@ decay to a char*, we're going to call strlen at some point.
 </aside>
 
 </section>
-<section id="slide-orgd148a0e">
-<h3 id="orgd148a0e">Recommendations</h3>
+<section id="slide-org42bc9fb">
+<h3 id="org42bc9fb">Recommendations</h3>
 <ul>
 <li>use <code>initializer_list</code> only for literal types</li>
 <li>consider using <code>array</code> and manually moving</li>
@@ -1892,18 +1911,424 @@ I'm not sure what to recommend. Really the first point.
 </section>
 </section>
 <section>
-<section id="slide-org37a9580">
-<h2 id="org37a9580">5. Putting stuff into a <code>map</code></h2>
+<section id="slide-org4fc0d57">
+<h2 id="org4fc0d57">5. Putting stuff into a <code>map</code></h2>
+<p>
+(or other associative container)
+</p>
+
 <p>
 It's a bit complicated.
 </p>
 
+<aside class="notes">
+<p>
+When I say <code>map</code>, I mean <code>map</code>, <code>unordered_map</code>, <code>multimap</code>, <code>unordered_multimap</code>,
+etc, and also the various flavours of <code>set</code>.
+</p>
+
+</aside>
+
 </section>
-<section id="slide-org163fc5d">
-<h3 id="org163fc5d">Exhibit G</h3>
+<section id="slide-org6a646bb">
+<h3 id="org6a646bb"><code>initializer_list</code> with <code>map</code></h3>
+<p>
+It's perfectly possible to initialize a map with an <code>initializer_list</code>.
+</p>
 <div class="org-src-container">
 
-<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">Storage</span> = <span style="color: #228b22;">unordered_set</span><span style="color: #707183;">&lt;</span>ClientIdRecord<span style="color: #707183;">&gt;</span>;
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span> <span style="color: #707183;">{</span> <span style="color: #7388d6;">{</span><span style="color: #008b8b;">0</span>, Foo<span style="color: #909183;">{}</span><span style="color: #7388d6;">}</span> <span style="color: #707183;">}</span>; <span style="color: #006400;">// </span><span style="color: #006400;">how many constructs/copies/moves?</span>
+</pre>
+</div>
+
+<p>
+Use aggregate initialization with <code>pair</code>.
+</p>
+
+<p>
+Suffers from the same problems as we saw earlier.
+</p>
+
+<p>
+And we can use the manual-array and move-iterator trick also.
+</p>
+
+<aside class="notes">
+<p>
+Same as the <code>vector</code> init case basically.
+</p>
+
+<p>
+You can't use explicit constructors easily here.
+</p>
+
+<p>
+If you have explicit constructors you might need to explicitly call out the type
+ of pair; it's not going to make a lot of difference.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgadf9ece">
+<h3 id="orgadf9ece">Alternative: templatery</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">call an N-ary function on each lot of N args passed in</span>
+<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #228b22;">size_t</span> <span style="color: #a0522d;">N</span>, <span style="color: #a020f0;">typename</span> <span style="color: #228b22;">F</span>, <span style="color: #a020f0;">typename</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Ts</span><span style="color: #707183;">&gt;</span>
+<span style="color: #228b22;">void</span> <span style="color: #0000ff;">for_each_n_args</span><span style="color: #707183;">(</span><span style="color: #228b22;">F</span>&amp;&amp; <span style="color: #a0522d;">f</span>, <span style="color: #228b22;">Ts</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">ts</span><span style="color: #707183;">)</span>;
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+for_each_n_args<span style="color: #707183;">&lt;</span><span style="color: #008b8b;">2</span><span style="color: #707183;">&gt;(</span>
+  <span style="color: #7388d6;">[</span>&amp;<span style="color: #7388d6;">]</span> <span style="color: #7388d6;">(</span><span style="color: #a020f0;">auto</span>&amp;&amp; <span style="color: #a0522d;">k</span>, <span style="color: #a020f0;">auto</span>&amp;&amp; <span style="color: #a0522d;">v</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span>
+      m.emplace<span style="color: #909183;">(</span>forward<span style="color: #709870;">&lt;</span><span style="color: #a020f0;">decltype</span><span style="color: #907373;">(</span>k<span style="color: #907373;">)</span><span style="color: #709870;">&gt;(</span>k<span style="color: #709870;">)</span>,
+                forward<span style="color: #709870;">&lt;</span><span style="color: #a020f0;">decltype</span><span style="color: #907373;">(</span>v<span style="color: #907373;">)</span><span style="color: #709870;">&gt;(</span>v<span style="color: #709870;">)</span><span style="color: #909183;">)</span>; <span style="color: #7388d6;">}</span>,
+  <span style="color: #008b8b;">0</span>, <span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">we can call explicit constructor</span>
+</pre>
+</div>
+
+<p>
+If you know the types, you can probably write the lambda in a less ugly way.
+</p>
+
+<aside class="notes">
+<p>
+<code>for_each_n_args</code> is a function template that perfectly-forwards its arguments
+in groups of N to the function you give it.
+</p>
+
+<p>
+It's in the Phoenix code base and it's useful for things like this.
+</p>
+
+<p>
+Everything here gets constructed in place. No moves or copies.
+</p>
+
+<p>
+This lambda deals with single-argument constructors for value. But&#x2026;
+</p>
+
+</aside>
+
+
+</section>
+<section id="slide-org5efaf8f">
+<h3 id="org5efaf8f">Alternative: multi-arg templatery</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">call an N-ary function on each lot of N args passed in</span>
+<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #228b22;">size_t</span> <span style="color: #a0522d;">N</span>, <span style="color: #a020f0;">typename</span> <span style="color: #228b22;">F</span>, <span style="color: #a020f0;">typename</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Ts</span><span style="color: #707183;">&gt;</span>
+<span style="color: #228b22;">void</span> <span style="color: #0000ff;">for_each_n_args</span><span style="color: #707183;">(</span><span style="color: #228b22;">F</span>&amp;&amp; <span style="color: #a0522d;">f</span>, <span style="color: #228b22;">Ts</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">ts</span><span style="color: #707183;">)</span>;
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+for_each_n_args<span style="color: #707183;">&lt;</span><span style="color: #008b8b;">3</span><span style="color: #707183;">&gt;(</span>
+  <span style="color: #7388d6;">[</span>&amp;<span style="color: #7388d6;">]</span> <span style="color: #7388d6;">(</span><span style="color: #a020f0;">auto</span>&amp;&amp; <span style="color: #a0522d;">k</span>, <span style="color: #a020f0;">auto</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">v</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{</span>
+      m.emplace<span style="color: #909183;">(</span>
+        piecewise_construct,
+        forward_as_tuple<span style="color: #709870;">(</span>forward<span style="color: #907373;">&lt;</span><span style="color: #a020f0;">decltype</span><span style="color: #6276ba;">(</span>k<span style="color: #6276ba;">)</span><span style="color: #907373;">&gt;(</span>k<span style="color: #907373;">)</span><span style="color: #709870;">)</span>,
+        forward_as_tuple<span style="color: #709870;">(</span>forward<span style="color: #907373;">&lt;</span><span style="color: #a020f0;">decltype</span><span style="color: #6276ba;">(</span>v<span style="color: #6276ba;">)</span><span style="color: #907373;">&gt;(</span>v<span style="color: #907373;">)</span><span style="color: #0000ff;">...</span><span style="color: #709870;">)</span>; <span style="color: #88090B;">}</span>,
+  <span style="color: #008b8b;">0</span>, <span style="color: #008b8b;">1</span>, <span style="color: #008b8b;">2</span><span style="color: #88090B;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">explicit multi-arg value constructor</span>
+</pre>
+</div>
+
+<p>
+Everything constructed in place.
+</p>
+
+<aside class="notes">
+<p>
+Here we are calling S's two-arg constructor.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgb6701e8">
+<h3 id="orgb6701e8">Enough about initializing</h3>
+<p>
+How about putting things into an existing <code>map</code>?
+</p>
+
+</section>
+<section id="slide-orga32fefb">
+<h3 id="orga32fefb">The Easy Way: <code>operator[]</code></h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">but an explicit constructor from int</span>
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+m<span style="color: #707183;">[</span><span style="color: #008b8b;">0</span><span style="color: #707183;">]</span> = S<span style="color: #707183;">{</span><span style="color: #008b8b;">1</span><span style="color: #707183;">}</span>;
+m<span style="color: #707183;">[</span><span style="color: #008b8b;">1</span><span style="color: #707183;">]</span> = Foo<span style="color: #707183;">{}</span>;
+</pre>
+</div>
+
+<p>
+How many constructs/moves/copies?
+</p>
+
+<aside class="notes">
+<p>
+These each have a construct, a default construct, and a move.
+</p>
+
+<p>
+The advantage of this is that when you know the element is there already, it's
+fine. You just get a lookup and an assign.
+</p>
+
+<p>
+But if the element isn't there, you never get a copy construct or a move
+construct here.
+</p>
+
+<p>
+You always get an assign! Because you always get a default construct if the
+element isn't there.
+</p>
+
+<p>
+In fact this is the only function on map that requires your mapped<sub>type</sub> to have
+a default constructor! It's fine to use objects without default constructors in
+a map, if you never use this function. And that can be a significant thing.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org804f166">
+<h3 id="org804f166">The Other Easy Way: <code>insert</code></h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">but an explicit constructor from int</span>
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+
+<span style="color: #006400;">// </span><span style="color: #006400;">pair&lt;iterator,bool&gt; insert(value_type&amp;&amp; value);</span>
+
+<span style="color: #006400;">// </span><span style="color: #006400;">template &lt;class T1, class T2&gt;</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">pair&lt;V1,V2&gt; make_pair(T1&amp;&amp; t, T2&amp;&amp; u);</span>
+
+<span style="color: #006400;">// </span><span style="color: #006400;">alternatives:</span>
+m.insert<span style="color: #707183;">(</span>make_pair<span style="color: #7388d6;">(</span><span style="color: #008b8b;">0</span>, S<span style="color: #909183;">{</span><span style="color: #008b8b;">1</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
+m.insert<span style="color: #707183;">(</span>pair&lt;<span style="color: #228b22;">int</span>, <span style="color: #228b22;">S</span>&amp;&amp;&gt;<span style="color: #7388d6;">(</span><span style="color: #008b8b;">0</span>, S<span style="color: #909183;">{</span><span style="color: #008b8b;">1</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
+m.insert<span style="color: #707183;">(</span>make_pair<span style="color: #7388d6;">(</span><span style="color: #008b8b;">0</span>, <span style="color: #008b8b;">1</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<p>
+How many constructs/moves/copies?
+</p>
+
+<aside class="notes">
+<p>
+
+</p>
+
+<p>
+The first line here creates an S, moves it into pair&lt;int, S&gt;, then moves the
+pair into the map.
+</p>
+
+<p>
+Remember that make<sub>pair</sub> deduces the type of its arguments. And V1 and V2 here
+are the decayed types of T1 and T2.
+</p>
+
+<p>
+The second line forces a pair of type &lt;int, S&amp;&amp;&gt;, so you get one move after the
+initial construct.
+</p>
+
+<p>
+The third line makes a pair&lt;int, int&gt; then uses that pair to construct a pair
+of &lt;int, S&gt; in the map.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org53a6911">
+<h3 id="org53a6911"><code>emplace</code></h3>
+<p>
+Enter the <i>wonderful C++11 panacea</i> that is move semantics.
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">but an explicit constructor from int</span>
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+
+<span style="color: #006400;">// </span><span style="color: #006400;">template &lt;class... Args&gt;</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">pair&lt;iterator,bool&gt; emplace(Args&amp;&amp;... args);</span>
+
+<span style="color: #006400;">// </span><span style="color: #006400;">this was 2 moves</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">m.insert(make_pair(0, S{1}));</span>
+
+<span style="color: #006400;">// </span><span style="color: #006400;">much better, right?</span>
+m.emplace<span style="color: #707183;">(</span>make_pair<span style="color: #7388d6;">(</span><span style="color: #008b8b;">0</span>, S<span style="color: #909183;">{</span><span style="color: #008b8b;">1</span><span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<p>
+You guessed it&#x2026;
+</p>
+
+<aside class="notes">
+<p>
+Don't do this. It is <i>exactly</i> the same as <code>insert</code> here. Two moves.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgb1185f4">
+<h3 id="orgb1185f4"><code>emplace</code>, better usage</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">but an explicit constructor from int</span>
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+
+<span style="color: #006400;">// </span><span style="color: #006400;">template &lt;class... Args&gt;</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">pair&lt;iterator,bool&gt; emplace(Args&amp;&amp;... args);</span>
+
+m.emplace<span style="color: #707183;">(</span><span style="color: #008b8b;">0</span>, <span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">no moves, just a construct</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Again, the point of <code>emplace</code> is in-place construction.
+</p>
+
+<p>
+It doesn't help you over <code>insert</code> if you just pass rvalues. <code>insert</code> works just
+fine with rvalues.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orge00affa">
+<h3 id="orge00affa"><code>emplace</code>: <code>blz</code> caveat</h3>
+<p>
+At the moment, <code>blz::map::emplace</code> cannot invoke <code>explicit</code> constructors.
+</p>
+
+<p>
+(<code>blz::vector::emplace_back</code> can)
+</p>
+
+<aside class="notes">
+<p>
+This is a gnarly area of the STL: conditionally explicit constructors on <code>pair</code>.
+</p>
+
+<p>
+There's an issue open on <code>blz</code> about it: if it's important to you, help with the
+fix. It's been difficult to achieve cross-platform compiler support properly.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgc27573e">
+<h3 id="orgc27573e"><code>emplace</code> problem</h3>
+<p>
+What do we do when we want to default-construct the value?
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+m.emplace<span style="color: #707183;">(</span><span style="color: #008b8b;">0</span><span style="color: #707183;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">default construct S please!</span>
+</pre>
+</div>
+
+<p class="fragment (appear)">
+<i>error 2665: <code>std::pair&lt;const _Kty,_Ty&gt;::pair</code>: none of the 2 overloads could
+convert all the argument types</i>
+</p>
+
+<aside class="notes">
+<p>
+Here's a problem: how can we tell <code>emplace</code> to zero-arg construct the value when
+we can't syntactically pass "zero arguments" in the place of an argument.
+</p>
+
+<p>
+We don't want to default-construct an S explicitly here and move it in.
+</p>
+
+<p>
+Remember the <code>value_type</code> of the <code>map</code> is a <code>pair</code> - that's what <code>emplace</code> is
+trying to construct.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org8d54451">
+<h3 id="org8d54451"><code>emplace</code> with zero-arg constructor</h3>
+<p>
+Our old friend <code>piecewise_construct</code> can help.
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+m.emplace<span style="color: #707183;">(</span>piecewise_construct,
+          forward_as_tuple<span style="color: #7388d6;">(</span><span style="color: #008b8b;">0</span><span style="color: #7388d6;">)</span>,
+          forward_as_tuple<span style="color: #7388d6;">()</span><span style="color: #707183;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">default construct S please!</span>
+</pre>
+</div>
+
+<p>
+Tuples are allowed to be empty!
+</p>
+
+<p>
+Yes, we can also use this for more-than-one-arg constructors.
+</p>
+
+<aside class="notes">
+<p>
+Here's the piecewise constructor on <code>pair</code> again.
+</p>
+
+<p>
+This also gets around the <code>blz</code> limitation on <code>explicit</code> constructors with
+<code>emplace</code>. So there is a way to achieve optimality with <code>blz</code>.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org2b44c87">
+<h3 id="org2b44c87">Exhibit G</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">explicit ClientIdRecord(</span>
+<span style="color: #006400;">//  </span><span style="color: #006400;">const string&amp; clientId, const ProcessId&amp; clientProcess, const ProcessId&amp; romeoProcess);</span>
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">Storage</span> = <span style="color: #228b22;">unordered_set</span><span style="color: #707183;">&lt;</span>ClientIdRecord<span style="color: #707183;">&gt;</span>;
 <span style="color: #228b22;">Storage</span> <span style="color: #a0522d;">m_storage</span>;
 m_storage.emplace<span style="color: #707183;">(</span>inClientId, process, romeoProcess<span style="color: #707183;">)</span>;
 </pre>
@@ -1919,17 +2344,28 @@ Then we want to change the <code>unordered_set</code> to an <code>unordered_map<
 
 <aside class="notes">
 <p>
+ClientIdRecord has a 3-argument constructor.
+</p>
+
+<p>
+<code>inClientId</code> is a string
+</p>
+
+<p>
 One in-place construct. This is fine.
 </p>
 
 </aside>
 
 </section>
-<section id="slide-orgfb2010c">
-<h3 id="orgfb2010c">Exhibit G</h3>
+<section id="slide-orgd05fb6b">
+<h3 id="orgd05fb6b">Exhibit G</h3>
 <div class="org-src-container">
 
-<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">Storage</span> = <span style="color: #228b22;">unordered_map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">string</span>, ClientIdRecord<span style="color: #707183;">&gt;</span>;
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">explicit ClientIdRecord(</span>
+<span style="color: #006400;">//  </span><span style="color: #006400;">const string&amp; clientId, const ProcessId&amp; clientProcess, const ProcessId&amp; romeoProcess);</span>
+
+<span style="color: #a020f0;">using</span> <span style="color: #228b22;">Storage</span> = <span style="color: #228b22;">unordered_map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">string</span>, ClientIdRecord<span style="color: #707183;">&gt;</span>;
 <span style="color: #228b22;">Storage</span> <span style="color: #a0522d;">m_storage</span>;
 m_storage.emplace<span style="color: #707183;">(</span>
   make_pair<span style="color: #7388d6;">(</span>inClientId,
@@ -1938,10 +2374,14 @@ m_storage.emplace<span style="color: #707183;">(</span>
 </div>
 
 <p>
-2 extra moves.
+Is this optimal?
 </p>
 
 <aside class="notes">
+<p>
+2 extra moves here.
+</p>
+
 <p>
 How do we do better?
 </p>
@@ -1949,8 +2389,8 @@ How do we do better?
 </aside>
 
 </section>
-<section id="slide-org7cf308c">
-<h3 id="org7cf308c">Exhibit G</h3>
+<section id="slide-org58c8dc6">
+<h3 id="org58c8dc6">Exhibit G</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">Storage</span> = <span style="color: #228b22;">unordered_map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">string</span>, ClientIdRecord<span style="color: #707183;">&gt;</span>;
@@ -1966,33 +2406,595 @@ Use <code>piecewise_construct</code> again.
 </p>
 
 </section>
-</section>
-<section>
-<section id="slide-orgb39a4cd">
-<h2 id="orgb39a4cd">6. Miscellany</h2>
-<div class="outline-text-2" id="text-orgb39a4cd">
-</div>
-</section>
-<section id="slide-org08c94ba">
-<h3 id="org08c94ba">Putting stuff into other things</h3>
+<section id="slide-org3f539f0">
+<h3 id="org3f539f0"><code>emplace</code> problem 2</h3>
 <p>
-Like <code>optional</code>, <code>variant</code>, <code>any</code>.
+What do you do if you want to <code>emplace</code> the result of a function call?
 </p>
 
 <div class="org-src-container">
 
-<pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
-<span style="color: #a020f0;">constexpr</span> <span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">optional</span><span style="color: #707183;">(</span><span style="color: #008b8b;">std</span>::in_place_t, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
-
-<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span> <span style="color: #228b22;">T</span>, <span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
-<span style="color: #a020f0;">constexpr</span> <span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">variant</span><span style="color: #707183;">(</span><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">in_place_type_t</span><span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">T</span><span style="color: #7388d6;">&gt;</span>, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
-<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">size_t</span> <span style="color: #a0522d;">I</span>, <span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
-<span style="color: #a020f0;">constexpr</span> <span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">variant</span><span style="color: #707183;">(</span><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">in_place_index_t</span><span style="color: #7388d6;">&lt;</span>I<span style="color: #7388d6;">&gt;</span>, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
-
-<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span> <span style="color: #228b22;">ValueType</span>, <span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
-<span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">any</span><span style="color: #707183;">(</span><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">in_place_type_t</span><span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">ValueType</span><span style="color: #7388d6;">&gt;</span>, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
+<pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">get_S</span><span style="color: #707183;">()</span> <span style="color: #707183;">{</span> <span style="color: #a020f0;">return</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>; <span style="color: #707183;">}</span>
 </pre>
 </div>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+m.emplace<span style="color: #707183;">(</span><span style="color: #008b8b;">0</span>, get_S<span style="color: #7388d6;">()</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<p>
+How can we avoid the move?
+</p>
+
+<p>
+Is it possible to in-place construct here?
+</p>
+
+</section>
+<section id="slide-org4b88cdb">
+<h3 id="org4b88cdb">In-place construct a function call result</h3>
+<p>
+We can't avoid evaluating the function call before calling <code>emplace</code>.
+</p>
+
+<p>
+But, we can control when the result of the function call becomes an <code>S</code>.
+</p>
+
+</section>
+<section id="slide-org9128ba7">
+<h3 id="org9128ba7">In-place construct a function call result</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">F</span><span style="color: #707183;">&gt;</span>
+<span style="color: #a020f0;">struct</span> <span style="color: #228b22;">with_result_of_t</span>
+<span style="color: #707183;">{</span>
+  <span style="color: #a020f0;">using</span> <span style="color: #228b22;">T</span> = <span style="color: #228b22;">invoke_result_t</span><span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">F</span><span style="color: #7388d6;">&gt;</span>;
+  <span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">with_result_of_t</span><span style="color: #7388d6;">(</span><span style="color: #228b22;">F</span> <span style="color: #a0522d;">f</span><span style="color: #7388d6;">)</span> : f<span style="color: #7388d6;">(</span>move<span style="color: #909183;">(</span>f<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span> <span style="color: #7388d6;">{}</span>
+  <span style="color: #a020f0;">operator</span> <span style="color: #228b22;">T</span><span style="color: #7388d6;">()</span> <span style="color: #7388d6;">{</span> <span style="color: #a020f0;">return</span> f<span style="color: #909183;">()</span>; <span style="color: #7388d6;">}</span>
+
+<span style="color: #a020f0;">private</span>:
+  <span style="color: #228b22;">F</span> <span style="color: #a0522d;">f</span>;
+<span style="color: #707183;">}</span>;
+
+<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">F</span><span style="color: #707183;">&gt;</span>
+<span style="color: #a020f0;">inline</span> <span style="color: #a020f0;">auto</span> <span style="color: #0000ff;">with_result_of</span><span style="color: #707183;">(</span><span style="color: #228b22;">F</span>&amp;&amp; <span style="color: #a0522d;">f</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">{</span>
+  <span style="color: #a020f0;">return</span> with_result_of_t<span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">F</span><span style="color: #7388d6;">&gt;(</span>forward<span style="color: #909183;">&lt;</span><span style="color: #228b22;">F</span><span style="color: #909183;">&gt;(</span>f<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>;
+<span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Capture the function and call it only at the point that we want to convert the
+result to an <code>S</code>.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orge2af73f">
+<h3 id="orge2af73f"><code>emplace</code> problem 2</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">get_S</span><span style="color: #707183;">()</span> <span style="color: #707183;">{</span> <span style="color: #a020f0;">return</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>; <span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+m.emplace<span style="color: #707183;">(</span><span style="color: #008b8b;">0</span>, with_result_of<span style="color: #7388d6;">(</span><span style="color: #909183;">[]</span> <span style="color: #909183;">{</span> <span style="color: #a020f0;">return</span> get_S<span style="color: #709870;">()</span>; <span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
+
+<span style="color: #006400;">// </span><span style="color: #006400;">m.emplace(0, with_result_of(get_S));</span>
+</pre>
+</div>
+
+<p>
+Compilers are really good at optimizing single-use lambdas.
+</p>
+
+<aside class="notes">
+<p>
+You would think the second line here would work just as well. But VC++
+doesn't manage to elide the move.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgfd19d1e">
+<h3 id="orgfd19d1e">C++17: <code>insert_or_assign</code></h3>
+<p>
+Of course, <code>insert</code> / <code>emplace</code> and <code>operator[]</code> actually do different things.
+</p>
+
+<p>
+What do you do if you want to insert, or assign if the element is already there?
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span> <span style="color: #228b22;">M</span><span style="color: #707183;">&gt;</span>
+<span style="color: #228b22;">pair</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">iterator</span>, <span style="color: #228b22;">bool</span><span style="color: #707183;">&gt;</span> <span style="color: #0000ff;">insert_or_assign</span><span style="color: #707183;">(</span><span style="color: #a020f0;">const</span> <span style="color: #228b22;">key_type</span>&amp; <span style="color: #a0522d;">k</span>, <span style="color: #228b22;">M</span>&amp;&amp; <span style="color: #a0522d;">obj</span><span style="color: #707183;">)</span>;
+
+<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span> <span style="color: #228b22;">M</span><span style="color: #707183;">&gt;</span>
+<span style="color: #228b22;">pair</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">iterator</span>, <span style="color: #228b22;">bool</span><span style="color: #707183;">&gt;</span> <span style="color: #0000ff;">insert_or_assign</span><span style="color: #707183;">(</span><span style="color: #228b22;">key_type</span>&amp;&amp; <span style="color: #a0522d;">k</span>, <span style="color: #228b22;">M</span>&amp;&amp; <span style="color: #a0522d;">obj</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<p>
+Introduced with C++17.
+</p>
+
+<aside class="notes">
+<p>
+<code>insert_or_assign</code> doesn't need default construction (unlike <code>operator[]</code>).
+</p>
+
+<p>
+<code>insert_or_assign</code> was introduced with C++17. Can be written as a free function,
+but difficult/impossible to make as efficient as map can as a member function.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orge3039fb">
+<h3 id="orge3039fb">C++17: <code>insert_or_assign</code></h3>
+<p>
+Yet another slightly different interface&#x2026;
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span>;
+<span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+m.insert_or_assign<span style="color: #707183;">(</span><span style="color: #008b8b;">0</span>, Foo<span style="color: #7388d6;">{}</span><span style="color: #707183;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">implicit construction - fine</span>
+
+<span style="color: #006400;">// </span><span style="color: #006400;">m.insert_or_assign(1, 1);  // explicit construction - error!</span>
+m.insert_or_assign<span style="color: #707183;">(</span><span style="color: #008b8b;">1</span>, with_result_of<span style="color: #7388d6;">(</span><span style="color: #909183;">[]{</span> <span style="color: #a020f0;">return</span> S<span style="color: #709870;">{</span><span style="color: #008b8b;">1</span><span style="color: #709870;">}</span>; <span style="color: #909183;">}</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">RVO</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Unfortunately there is no <code>emplace_or_assign</code>. (In the assign case presumably
+could not avoid making a temporary to assign). But you can use the same
+<code>with_result_of</code> technique with <code>insert_or_assign</code>.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org500cee5">
+<h3 id="org500cee5">Exhibit H</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">K</span>, <span style="color: #a020f0;">typename</span> <span style="color: #228b22;">V</span><span style="color: #707183;">&gt;</span>
+<span style="color: #a020f0;">typename</span> <span style="color: #008b8b;">LRUCache</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">K</span>, <span style="color: #228b22;">V</span><span style="color: #707183;">&gt;</span>::<span style="color: #228b22;">EntryPtr</span> <span style="color: #008b8b;">LRUCache</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">K</span>, <span style="color: #228b22;">V</span><span style="color: #707183;">&gt;</span>::<span style="color: #0000ff;">Insert</span><span style="color: #707183;">(</span><span style="color: #a020f0;">const</span> <span style="color: #228b22;">K</span>&amp; <span style="color: #a0522d;">key</span>, <span style="color: #228b22;">V</span> <span style="color: #a0522d;">value</span><span style="color: #707183;">)</span>
+<span style="color: #707183;">{</span>
+  <span style="color: #006400;">// </span><span style="color: #006400;">Is the key already present?</span>
+  <span style="color: #a020f0;">if</span> <span style="color: #7388d6;">(</span>m_entries.find<span style="color: #909183;">(</span>key<span style="color: #909183;">)</span> != m_entries.end<span style="color: #909183;">()</span><span style="color: #7388d6;">)</span> <span style="color: #a020f0;">return</span> <span style="color: #008b8b;">nullptr</span>;
+
+  <span style="color: #006400;">// </span><span style="color: #006400;">Is the cache full?</span>
+  <span style="color: #a020f0;">if</span> <span style="color: #7388d6;">(</span>m_entries.size<span style="color: #909183;">()</span> == m_capacity<span style="color: #7388d6;">)</span> Evict<span style="color: #7388d6;">(</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">)</span>;
+
+  <span style="color: #006400;">// </span><span style="color: #006400;">Insert the new value.</span>
+  <span style="color: #228b22;">EntryPtr</span> <span style="color: #a0522d;">e</span> = <span style="color: #008b8b;">blz</span>::make_shared<span style="color: #7388d6;">&lt;</span>Entry<span style="color: #7388d6;">&gt;(</span>key, <span style="color: #008b8b;">blz</span>::move<span style="color: #909183;">(</span>value<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>;
+  Append<span style="color: #7388d6;">(</span>e.get<span style="color: #909183;">()</span><span style="color: #7388d6;">)</span>;
+  m_entries<span style="color: #7388d6;">[</span>key<span style="color: #7388d6;">]</span> = e;
+
+  <span style="color: #a020f0;">return</span> e;
+<span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Given everything we've learned, let's critique this code.
+</p>
+
+<p>
+We can see that it's inserting a KV pair into a cache with a least-recently-used
+eviction strategy. There is a map that owns a shared<sub>ptr</sub>, and that shared<sub>ptr</sub> is
+also weakly-referenced from a deque (see Append call)?
+</p>
+
+<ul>
+<li>use pass-by-value to simplify handling</li>
+<li>use <code>make_shared</code></li>
+
+<li>use <code>operator[]</code> - default construct shared<sub>ptr</sub> + assign</li>
+<li>extra shared<sub>ptr</sub> ref</li>
+
+</ul>
+
+</aside>
+
+</section>
+<section id="slide-org5525390">
+<h3 id="org5525390">Exhibit H</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">Insert the new value.</span>
+<span style="color: #a020f0;">decltype</span><span style="color: #707183;">(</span>m_entries.begin<span style="color: #7388d6;">()</span><span style="color: #707183;">)</span> <span style="color: #a0522d;">it</span>;
+<span style="color: #008b8b;">blz</span>::tie<span style="color: #707183;">(</span>it, <span style="color: #008b8b;">blz</span>::ignore<span style="color: #707183;">)</span> =
+  m_entries.emplace<span style="color: #707183;">(</span>key, <span style="color: #008b8b;">blz</span>::make_shared<span style="color: #7388d6;">&lt;</span>Entry<span style="color: #7388d6;">&gt;(</span>key, <span style="color: #008b8b;">blz</span>::move<span style="color: #909183;">(</span>value<span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
+Append<span style="color: #707183;">(</span>it-&gt;second.get<span style="color: #7388d6;">()</span><span style="color: #707183;">)</span>;
+
+<span style="color: #a020f0;">return</span> it-&gt;second;
+</pre>
+</div>
+
+<aside class="notes">
+<ul>
+<li>m<sub>entries</sub> can still be any associative container (no loss of generality)</li>
+<li>save 2 shared<sub>ptr</sub> reference updates (plus check on assign of the default-constructed one)</li>
+
+</ul>
+
+<p>
+We could use with<sub>result</sub><sub>of</sub> here to construct the shared<sub>ptr</sub> directly in place.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org5e50891">
+<h3 id="org5e50891">Recommendations</h3>
+<p>
+Yes, C++ is complicated.
+</p>
+
+<ul>
+<li>Initialization: consider <code>for_each_n_args</code></li>
+<li>Feel free to use <code>insert</code> with <code>make_pair</code>
+<ul>
+<li>But don't use call-site construction</li>
+
+</ul></li>
+<li>Use <code>emplace</code> but beware of explicit construction with <code>blz</code></li>
+<li>Use <code>piecewise_construct</code> for other than single-arg construction</li>
+<li>Try to avoid <code>operator[]</code></li>
+<li>Adopt <code>insert_or_assign</code> when it's available</li>
+<li>Consider <code>with_result_of</code></li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgf68f8d4">
+<h2 id="orgf68f8d4">6. Putting stuff into other things</h2>
+<p>
+Like <code>optional</code>, <code>variant</code>, <code>any</code>.
+</p>
+
+</section>
+<section id="slide-org0243c0f">
+<h3 id="org0243c0f"><code>optional</code> and friends</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
+<span style="color: #a020f0;">constexpr</span> <span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">optional</span><span style="color: #707183;">(</span><span style="color: #228b22;">in_place_t</span>, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
+
+<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span> <span style="color: #228b22;">T</span>, <span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
+<span style="color: #a020f0;">constexpr</span> <span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">variant</span><span style="color: #707183;">(</span><span style="color: #228b22;">in_place_type_t</span><span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">T</span><span style="color: #7388d6;">&gt;</span>, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
+<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #228b22;">size_t</span> <span style="color: #a0522d;">I</span>, <span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
+<span style="color: #a020f0;">constexpr</span> <span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">variant</span><span style="color: #707183;">(</span><span style="color: #228b22;">in_place_index_t</span><span style="color: #7388d6;">&lt;</span>I<span style="color: #7388d6;">&gt;</span>, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
+
+<span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span> <span style="color: #228b22;">ValueType</span>, <span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
+<span style="color: #a020f0;">explicit</span> <span style="color: #0000ff;">any</span><span style="color: #707183;">(</span><span style="color: #228b22;">in_place_type_t</span><span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">ValueType</span><span style="color: #7388d6;">&gt;</span>, <span style="color: #228b22;">Args</span>&amp;&amp;<span style="color: #0000ff;">...</span> <span style="color: #a0522d;">args</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+All these new vocabulary types have constructors that take <code>in_place</code> tag
+arguments. They work similarly to <code>piecewise_construct</code> but they're only
+constructing one thing.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgfe2460c">
+<h3 id="orgfe2460c"><code>optional</code> construction</h3>
+<p>
+implicit constructor
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">optional</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">opt</span> = Foo<span style="color: #707183;">{}</span>;
+</pre>
+</div>
+
+<p>
+<code>explicit</code> constructor (naive method)
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">optional</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">opt</span> = S<span style="color: #707183;">{</span><span style="color: #008b8b;">1</span><span style="color: #707183;">}</span>;
+</pre>
+</div>
+
+<p>
+<code>explicit</code> constructor (in-place method)
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">optional</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">opt</span><span style="color: #707183;">(</span>in_place, <span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+In the first case, it's fine: just one in-place construct.
+</p>
+
+<p>
+In the second case, we have an <code>explicit</code> constructor. So if we use this style,
+we get a construct and a move.
+</p>
+
+<p>
+The third case is the way to go for in-place construction. It can also be used
+with an implicit constructor of course.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgfb58c80">
+<h3 id="orgfb58c80"><code>optional</code> assignment</h3>
+<p>
+implicit constructor
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">optional</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">opt</span>;
+opt = Foo<span style="color: #707183;">{}</span>;
+</pre>
+</div>
+
+<p>
+<code>explicit</code> constructor (naive method)
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">optional</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">opt</span>;
+opt = S<span style="color: #707183;">{</span><span style="color: #008b8b;">1</span><span style="color: #707183;">}</span>;
+</pre>
+</div>
+
+<p>
+<code>explicit</code> constructor (in-place method)
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">optional</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">opt</span>;
+opt.emplace<span style="color: #707183;">(</span><span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Similar story here.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orgd9fafb9">
+<h3 id="orgd9fafb9"><code>optional</code> recommendations</h3>
+<ul>
+<li>use the <code>in_place_t</code> constructor</li>
+<li>use <code>=</code> for assignment, but avoid <code>explicit</code> construction</li>
+<li>use <code>emplace</code> for assignment</li>
+
+</ul>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">optional</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">opt</span><span style="color: #707183;">(</span>in_place, <span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;
+opt = Foo<span style="color: #707183;">{}</span>;
+opt.emplace<span style="color: #707183;">(</span><span style="color: #008b8b;">2</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+You'll never go wrong with these.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org541af60">
+<h3 id="org541af60"><code>variant</code> construction</h3>
+<p>
+implicit constructor
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = Foo<span style="color: #707183;">{}</span>;
+</pre>
+</div>
+
+<p>
+<code>explicit</code> constructor (naive method)
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = S<span style="color: #707183;">{</span><span style="color: #008b8b;">1</span><span style="color: #707183;">}</span>;
+</pre>
+</div>
+
+<p>
+<code>explicit</code> constructor (oops method)
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = <span style="color: #008b8b;">1</span>;
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+Similar story as <code>optional</code>.
+</p>
+
+<p>
+But there is the potential for a bug with the <code>explicit</code> constructor. What makes
+this somewhat likely is that it might be the case that someone makes a
+constructor explicit later on.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org181b3fc">
+<h3 id="org181b3fc"><code>variant</code> construction</h3>
+<p>
+Recommendation: use either of these two constructions.
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #0000ff;">v</span><span style="color: #707183;">(</span><span style="color: #228b22;">in_place_type</span><span style="color: #7388d6;">&lt;</span>S<span style="color: #7388d6;">&gt;</span>, <span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #0000ff;">v</span><span style="color: #707183;">(</span><span style="color: #228b22;">in_place_index</span><span style="color: #7388d6;">&lt;</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">&gt;</span>, <span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+I would generally prefer the first except in cases where the same type occurs in
+multiple places in the <code>variant</code>, which is relatively rarer.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orge5f4f5c">
+<h3 id="orge5f4f5c"><code>variant</code> assignment</h3>
+<p>
+Similar story to construction.
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span>;
+
+v = Foo<span style="color: #707183;">{}</span>; <span style="color: #006400;">// </span><span style="color: #006400;">fine</span>
+v = S<span style="color: #707183;">{</span><span style="color: #008b8b;">1</span><span style="color: #707183;">}</span>;  <span style="color: #006400;">// </span><span style="color: #006400;">constructs a temporary</span>
+v = <span style="color: #008b8b;">1</span>;     <span style="color: #006400;">// </span><span style="color: #006400;">oops</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-org6809d68">
+<h3 id="org6809d68"><code>variant</code> danger!</h3>
+<p>
+Implicitly-typed <code>variant</code> construction/assignment can be dangerous.
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">bool</span>, <span style="color: #008b8b;">std</span>::string<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = <span style="color: #b22222;">"Hello"</span>;
+cout &lt;&lt; <span style="color: #b22222;">"index is "</span> &lt;&lt; v.index<span style="color: #707183;">()</span> &lt;&lt; <span style="color: #b22222;">'</span><span style="color: #b22222; font-weight: bold;">\</span><span style="color: #b22222; font-weight: bold;">n</span><span style="color: #b22222;">'</span>;
+</pre>
+</div>
+
+<p>
+What does this output?
+</p>
+
+<aside class="notes">
+<p>
+Avoid implicit type conversions. They're dangerous. The first possible one will apply.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-org1643ae8">
+<h3 id="org1643ae8">Safe, efficient <code>variant</code> assignment</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span>;
+<span style="color: #006400;">// </span><span style="color: #006400;">template &lt;class T, class... Args&gt;</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">T&amp; emplace(Args&amp;&amp;... args);</span>
+v.emplace<span style="color: #707183;">&lt;</span><span style="color: #008b8b;">1</span><span style="color: #707183;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;  <span style="color: #006400;">// </span><span style="color: #006400;">S{1}</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #008b8b;">std</span>::<span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span>;
+<span style="color: #006400;">// </span><span style="color: #006400;">template &lt;size_t I, class... Args&gt;</span>
+<span style="color: #006400;">// </span><span style="color: #006400;">variant_alternative_t&lt;I, variant&gt;&amp; emplace(Args&amp;&amp;... args);</span>
+v.emplace<span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;  <span style="color: #006400;">// </span><span style="color: #006400;">S{1}</span>
+</pre>
+</div>
+
+</section>
+<section id="slide-org9caa482">
+<h3 id="org9caa482"><code>variant</code> recommendations</h3>
+<ul>
+<li>always be explicit about types</li>
+<li>use <code>in_place_type</code> or <code>in_place_index</code> constructors</li>
+<li>use <code>emplace</code></li>
+<li>avoid <code>operator=</code> (except actual <code>variant</code>-to-<code>variant</code>)</li>
+
+</ul>
+
+<aside class="notes">
+<p>
+Obviously <code>operator=</code> is used implicitly by the compiler.
+</p>
+
+</aside>
+
+</section>
+</section>
+<section>
+<section id="slide-org691fddb">
+<h2 id="org691fddb">7. Final Guidelines and Recommendations</h2>
+<p>
+Think about copies and moves.
+</p>
+
+<p>
+Moves aren't free, and may not be cheap.
+</p>
+
+<p>
+Usually, in-place construction is preferable. And it is nearly always possible.
+</p>
+
+<p>
+Know how RVO works, and check that the compiler is doing it when you think it is.
+</p>
+
+<p>
+Beware <code>initializer_list</code>.
+</p>
+
+<p>
+Feel free to ping me with any questions, any time.
+</p>
 </section>
 </section>
 </div>

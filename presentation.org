@@ -12,7 +12,7 @@
 #+REVEAL_EXTRA_CSS: ./presentation.css
 #+REVEAL_ROOT: ../reveal.js/
 
-#+TITLE: Mastering Move Semantics
+#+TITLE: Everyday Efficiency: In-place Construction
 #+AUTHOR: Ben Deane
 #+EMAIL: bdeane@blizzard.com
 #+DATE: July 2018
@@ -38,7 +38,8 @@
 1. Putting stuff into a ~vector~
 1. ~initializer_list~
 1. Putting stuff into a ~map~
-1. Miscellany
+1. Putting stuff into other things
+1. Final thoughts
 
 #+BEGIN_NOTES
 There will be a lot of code snippets in this talk.
@@ -437,12 +438,12 @@ e.g. returning a pair when the function returns a tuple, or something like that.
 
 It has to be decidable at construction time.
 #+BEGIN_SRC c++
-string undecided_function(double happiness)
+string undecided_function()
 {
   string happy = "Hooray";
   string sad = "Boo hoo";
 
-  if (happiness > 0.5)
+  if (getHappiness() > 0.5)
     return happy;
   else
     return sad;
@@ -830,7 +831,7 @@ For each element, we construct an ~S~ (from the ~Foo~) and then we move it into
 the ~vector~.
 #+END_NOTES
 
-** Example : copy
+** Example: copy
 What if we have an ~array~ of ~int~?
 
 #+BEGIN_SRC c++
@@ -849,7 +850,7 @@ Oops. The compiler is angry at us.
 constructor.
 #+END_NOTES
 
-** Example : copy?
+** Example: copy?
 OK, no problem, right?
 
 #+BEGIN_SRC c++
@@ -1126,7 +1127,7 @@ https://wg21.tartanllama.xyz/initializer_list
 
 ** Exhibit F
 #+BEGIN_SRC c++
-std::unordered_set<std::string> kKeywords = {
+unordered_set<string> kKeywords = {
 	"alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
 	"bool", "break", "case", "catch", "char", "class", "compl", "const",
 	"constexpr", "const_cast", "continue", "decltype", "default", "delete", "do",
@@ -1150,6 +1151,17 @@ std::unordered_set<std::string> kKeywords = {
 But that might hurt us with ~string~.
 
 [[https://www.youtube.com/watch?v=sSlmmZMFsXQ]["Initializer Lists are Broken, Let's Fix Them"]] -- Jason Turner, C++Now 2018
+
+** Surprising: ~string~ vs ~const char*~
+
+SBO-strings
+http://quick-bench.com/5dPSX8rx-R8_BIUYbYOp6DcqhAc
+
+Non SBO-strings 1:
+http://quick-bench.com/mr6ZIQ8Jy0ghe1scBcTznYF2s5w
+
+Non SBO-strings 2:
+http://quick-bench.com/vzlG11LwZN-uMAKdK8X1XgRuaWs
 
 #+BEGIN_NOTES
 Two things mess with our mental model for strings. First - the small buffer
@@ -1179,11 +1191,281 @@ I'm not sure what to recommend. Really the first point.
 
 * 5. Putting stuff into a ~map~
 
+(or other associative container)
+
 It's a bit complicated.
+
+#+BEGIN_NOTES
+When I say ~map~, I mean ~map~, ~unordered_map~, ~multimap~, ~unordered_multimap~,
+etc, and also the various flavours of ~set~.
+#+END_NOTES
+
+** ~initializer_list~ with ~map~
+
+It's perfectly possible to initialize a map with an ~initializer_list~.
+#+BEGIN_SRC c++
+// recall S has an implicit constructor from Foo
+
+using M = map<int, S>;
+M m { {0, Foo{}} }; // how many constructs/copies/moves?
+#+END_SRC
+
+Use aggregate initialization with ~pair~.
+
+Suffers from the same problems as we saw earlier.
+
+And we can use the manual-array and move-iterator trick also.
+
+#+BEGIN_NOTES
+Same as the ~vector~ init case basically.
+
+You can't use explicit constructors easily here.
+
+If you have explicit constructors you might need to explicitly call out the type
+ of pair; it's not going to make a lot of difference.
+#+END_NOTES
+
+** Alternative: templatery
+
+#+BEGIN_SRC c++
+// call an N-ary function on each lot of N args passed in
+template <size_t N, typename F, typename... Ts>
+void for_each_n_args(F&& f, Ts&&... ts);
+
+using M = map<int, S>;
+M m;
+for_each_n_args<2>(
+  [&] (auto&& k, auto&& v) {
+      m.emplace(forward<decltype(k)>(k),
+                forward<decltype(v)>(v)); },
+  0, 1); // we can call explicit constructor
+#+END_SRC
+
+If you know the types, you can probably write the lambda in a less ugly way.
+
+#+BEGIN_NOTES
+~for_each_n_args~ is a function template that perfectly-forwards its arguments
+in groups of N to the function you give it.
+
+It's in the Phoenix code base and it's useful for things like this.
+
+Everything here gets constructed in place. No moves or copies.
+
+This lambda deals with single-argument constructors for value. But...
+#+END_NOTES
+
+
+** Alternative: multi-arg templatery
+
+#+BEGIN_SRC c++
+// call an N-ary function on each lot of N args passed in
+template <size_t N, typename F, typename... Ts>
+void for_each_n_args(F&& f, Ts&&... ts);
+
+using M = map<int, S>;
+M m;
+for_each_n_args<3>(
+  [&] (auto&& k, auto&&... v) {
+      m.emplace(
+        piecewise_construct,
+        forward_as_tuple(forward<decltype(k)>(k)),
+        forward_as_tuple(forward<decltype(v)>(v)...); },
+  0, 1, 2); // explicit multi-arg value constructor
+#+END_SRC
+
+Everything constructed in place.
+
+#+BEGIN_NOTES
+Here we are calling S's two-arg constructor.
+#+END_NOTES
+
+** Enough about initializing
+
+How about putting things into an existing ~map~?
+
+** The Easy Way: ~operator[]~
+
+#+BEGIN_SRC c++
+// recall S has an implicit constructor from Foo
+// but an explicit constructor from int
+
+using M = map<int, S>;
+M m;
+m[0] = S{1};
+m[1] = Foo{};
+#+END_SRC
+
+How many constructs/moves/copies?
+
+#+BEGIN_NOTES
+These each have a construct, a default construct, and a move.
+
+The advantage of this is that when you know the element is there already, it's
+fine. You just get a lookup and an assign.
+
+But if the element isn't there, you never get a copy construct or a move
+construct here.
+
+You always get an assign! Because you always get a default construct if the
+element isn't there.
+
+In fact this is the only function on map that requires your mapped_type to have
+a default constructor! It's fine to use objects without default constructors in
+a map, if you never use this function. And that can be a significant thing.
+#+END_NOTES
+
+** The Other Easy Way: ~insert~
+
+#+BEGIN_SRC c++
+// recall S has an implicit constructor from Foo
+// but an explicit constructor from int
+
+using M = map<int, S>;
+M m;
+
+// pair<iterator,bool> insert(value_type&& value);
+
+// template <class T1, class T2>
+// pair<V1,V2> make_pair(T1&& t, T2&& u);
+
+// alternatives:
+m.insert(make_pair(0, S{1}));
+m.insert(pair<int, S&&>(0, S{1}));
+m.insert(make_pair(0, 1));
+#+END_SRC
+
+How many constructs/moves/copies?
+
+#+BEGIN_NOTES
+
+The first line here creates an S, moves it into pair<int, S>, then moves the
+pair into the map.
+
+Remember that make_pair deduces the type of its arguments. And V1 and V2 here
+are the decayed types of T1 and T2.
+
+The second line forces a pair of type <int, S&&>, so you get one move after the
+initial construct.
+
+The third line makes a pair<int, int> then uses that pair to construct a pair
+of <int, S> in the map.
+#+END_NOTES
+
+** ~emplace~
+
+Enter the /wonderful C++11 panacea/ that is move semantics.
+
+#+BEGIN_SRC c++
+// recall S has an implicit constructor from Foo
+// but an explicit constructor from int
+
+using M = map<int, S>;
+M m;
+
+// template <class... Args>
+// pair<iterator,bool> emplace(Args&&... args);
+
+// this was 2 moves
+// m.insert(make_pair(0, S{1}));
+
+// much better, right?
+m.emplace(make_pair(0, S{1}));
+#+END_SRC
+
+You guessed it...
+
+#+BEGIN_NOTES
+Don't do this. It is /exactly/ the same as ~insert~ here. Two moves.
+#+END_NOTES
+
+** ~emplace~, better usage
+
+#+BEGIN_SRC c++
+// recall S has an implicit constructor from Foo
+// but an explicit constructor from int
+
+using M = map<int, S>;
+M m;
+
+// template <class... Args>
+// pair<iterator,bool> emplace(Args&&... args);
+
+m.emplace(0, 1); // no moves, just a construct
+#+END_SRC
+
+#+BEGIN_NOTES
+Again, the point of ~emplace~ is in-place construction.
+
+It doesn't help you over ~insert~ if you just pass rvalues. ~insert~ works just
+fine with rvalues.
+#+END_NOTES
+
+** ~emplace~: ~blz~ caveat
+
+At the moment, ~blz::map::emplace~ cannot invoke ~explicit~ constructors.
+
+(~blz::vector::emplace_back~ can)
+
+#+BEGIN_NOTES
+This is a gnarly area of the STL: conditionally explicit constructors on ~pair~.
+
+There's an issue open on ~blz~ about it: if it's important to you, help with the
+fix. It's been difficult to achieve cross-platform compiler support properly.
+#+END_NOTES
+
+** ~emplace~ problem
+
+What do we do when we want to default-construct the value?
+
+#+BEGIN_SRC c++
+using M = map<int, S>;
+M m;
+m.emplace(0); // default construct S please!
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+/error 2665: ~std::pair<const _Kty,_Ty>::pair~: none of the 2 overloads could
+convert all the argument types/
+
+#+BEGIN_NOTES
+Here's a problem: how can we tell ~emplace~ to zero-arg construct the value when
+we can't syntactically pass "zero arguments" in the place of an argument.
+
+We don't want to default-construct an S explicitly here and move it in.
+
+Remember the ~value_type~ of the ~map~ is a ~pair~ - that's what ~emplace~ is
+trying to construct.
+#+END_NOTES
+
+** ~emplace~ with zero-arg constructor
+
+Our old friend ~piecewise_construct~ can help.
+
+#+BEGIN_SRC c++
+using M = map<int, S>;
+M m;
+m.emplace(piecewise_construct,
+          forward_as_tuple(0),
+          forward_as_tuple()); // default construct S please!
+#+END_SRC
+
+Tuples are allowed to be empty!
+
+Yes, we can also use this for more-than-one-arg constructors.
+
+#+BEGIN_NOTES
+Here's the piecewise constructor on ~pair~ again.
+
+This also gets around the ~blz~ limitation on ~explicit~ constructors with
+~emplace~. So there is a way to achieve optimality with ~blz~.
+#+END_NOTES
 
 ** Exhibit G
 
 #+BEGIN_SRC c++
+// explicit ClientIdRecord(
+//  const string& clientId, const ProcessId& clientProcess, const ProcessId& romeoProcess);
+
 using Storage = unordered_set<ClientIdRecord>;
 Storage m_storage;
 m_storage.emplace(inClientId, process, romeoProcess);
@@ -1194,12 +1476,19 @@ Perfectly fine as far as ~emplace~ usage.
 Then we want to change the ~unordered_set~ to an ~unordered_map~.
 
 #+BEGIN_NOTES
+ClientIdRecord has a 3-argument constructor.
+
+~inClientId~ is a string
+
 One in-place construct. This is fine.
 #+END_NOTES
 
 ** Exhibit G
 
 #+BEGIN_SRC c++
+// explicit ClientIdRecord(
+//  const string& clientId, const ProcessId& clientProcess, const ProcessId& romeoProcess);
+
 using Storage = unordered_map<string, ClientIdRecord>;
 Storage m_storage;
 m_storage.emplace(
@@ -1207,9 +1496,11 @@ m_storage.emplace(
             ClientIdRecord(inClientId, process, romeoProcess)));
 #+END_SRC
 
-2 extra moves.
+Is this optimal?
 
 #+BEGIN_NOTES
+2 extra moves here.
+
 How do we do better?
 #+END_NOTES
 
@@ -1225,21 +1516,384 @@ m_storage.emplace(piecewise_construct,
 
 Use ~piecewise_construct~ again.
 
-* 6. Miscellany
+** ~emplace~ problem 2
 
-** Putting stuff into other things
+What do you do if you want to ~emplace~ the result of a function call?
+
+#+BEGIN_SRC c++
+S get_S() { return S{1}; }
+#+END_SRC
+
+#+BEGIN_SRC c++
+using M = map<int, S>;
+M m;
+m.emplace(0, get_S());
+#+END_SRC
+
+How can we avoid the move?
+
+Is it possible to in-place construct here?
+
+** In-place construct a function call result
+
+We can't avoid evaluating the function call before calling ~emplace~.
+
+But, we can control when the result of the function call becomes an ~S~.
+
+** In-place construct a function call result
+
+#+BEGIN_SRC c++
+template <typename F>
+struct with_result_of_t
+{
+  using T = invoke_result_t<F>;
+  explicit with_result_of_t(F f) : f(move(f)) {}
+  operator T() { return f(); }
+
+private:
+  F f;
+};
+
+template <typename F>
+inline auto with_result_of(F&& f)
+{
+  return with_result_of_t<F>(forward<F>(f));
+}
+#+END_SRC
+
+#+BEGIN_NOTES
+Capture the function and call it only at the point that we want to convert the
+result to an ~S~.
+#+END_NOTES
+
+** ~emplace~ problem 2
+
+#+BEGIN_SRC c++
+S get_S() { return S{1}; }
+#+END_SRC
+
+#+BEGIN_SRC c++
+using M = map<int, S>;
+M m;
+m.emplace(0, with_result_of([] { return get_S(); }));
+
+// m.emplace(0, with_result_of(get_S));
+#+END_SRC
+
+Compilers are really good at optimizing single-use lambdas.
+
+#+BEGIN_NOTES
+You would think the second line here would work just as well. But VC++
+doesn't manage to elide the move.
+#+END_NOTES
+
+** C++17: ~insert_or_assign~
+
+Of course, ~insert~ / ~emplace~ and ~operator[]~ actually do different things.
+
+What do you do if you want to insert, or assign if the element is already there?
+
+#+BEGIN_SRC c++
+template <class M>
+pair<iterator, bool> insert_or_assign(const key_type& k, M&& obj);
+
+template <class M>
+pair<iterator, bool> insert_or_assign(key_type&& k, M&& obj);
+#+END_SRC
+
+Introduced with C++17.
+
+#+BEGIN_NOTES
+~insert_or_assign~ doesn't need default construction (unlike ~operator[]~).
+
+~insert_or_assign~ was introduced with C++17. Can be written as a free function,
+but difficult/impossible to make as efficient as map can as a member function.
+#+END_NOTES
+
+** C++17: ~insert_or_assign~
+
+Yet another slightly different interface...
+
+#+BEGIN_SRC c++
+using M = map<int, S>;
+M m;
+m.insert_or_assign(0, Foo{}); // implicit construction - fine
+
+// m.insert_or_assign(1, 1);  // explicit construction - error!
+m.insert_or_assign(1, with_result_of([]{ return S{1}; })); // RVO
+#+END_SRC
+
+#+BEGIN_NOTES
+Unfortunately there is no ~emplace_or_assign~. (In the assign case presumably
+could not avoid making a temporary to assign). But you can use the same
+~with_result_of~ technique with ~insert_or_assign~.
+#+END_NOTES
+
+** Exhibit H
+
+#+BEGIN_SRC c++
+template <typename K, typename V>
+typename LRUCache<K, V>::EntryPtr LRUCache<K, V>::Insert(const K& key, V value)
+{
+  // Is the key already present?
+  if (m_entries.find(key) != m_entries.end()) return nullptr;
+
+  // Is the cache full?
+  if (m_entries.size() == m_capacity) Evict(1);
+
+  // Insert the new value.
+  EntryPtr e = blz::make_shared<Entry>(key, blz::move(value));
+  Append(e.get());
+  m_entries[key] = e;
+
+  return e;
+}
+#+END_SRC
+
+#+BEGIN_NOTES
+Given everything we've learned, let's critique this code.
+
+We can see that it's inserting a KV pair into a cache with a least-recently-used
+eviction strategy. There is a map that owns a shared_ptr, and that shared_ptr is
+also weakly-referenced from a deque (see Append call)?
+
++ use pass-by-value to simplify handling
++ use ~make_shared~
+
+- use ~operator[]~ - default construct shared_ptr + assign
+- extra shared_ptr ref
+#+END_NOTES
+
+** Exhibit H
+
+#+BEGIN_SRC c++
+// Insert the new value.
+decltype(m_entries.begin()) it;
+blz::tie(it, blz::ignore) =
+  m_entries.emplace(key, blz::make_shared<Entry>(key, blz::move(value)));
+Append(it->second.get());
+
+return it->second;
+#+END_SRC
+
+#+BEGIN_NOTES
++ m_entries can still be any associative container (no loss of generality)
++ save 2 shared_ptr reference updates (plus check on assign of the default-constructed one)
+
+We could use with_result_of here to construct the shared_ptr directly in place.
+#+END_NOTES
+
+** Recommendations
+
+Yes, C++ is complicated.
+
+ - Initialization: consider ~for_each_n_args~
+ - Feel free to use ~insert~ with ~make_pair~
+   - But don't use call-site construction
+ - Use ~emplace~ but beware of explicit construction with ~blz~
+ - Use ~piecewise_construct~ for other than single-arg construction
+ - Try to avoid ~operator[]~
+ - Adopt ~insert_or_assign~ when it's available
+ - Consider ~with_result_of~
+
+* 6. Putting stuff into other things
 
 Like ~optional~, ~variant~, ~any~.
 
+** ~optional~ and friends
+
 #+BEGIN_SRC c++
 template <class... Args>
-constexpr explicit optional(std::in_place_t, Args&&... args);
+constexpr explicit optional(in_place_t, Args&&... args);
 
 template <class T, class... Args>
-constexpr explicit variant(std::in_place_type_t<T>, Args&&... args);
-template <std::size_t I, class... Args>
-constexpr explicit variant(std::in_place_index_t<I>, Args&&... args);
+constexpr explicit variant(in_place_type_t<T>, Args&&... args);
+template <size_t I, class... Args>
+constexpr explicit variant(in_place_index_t<I>, Args&&... args);
 
 template <class ValueType, class... Args>
-explicit any(std::in_place_type_t<ValueType>, Args&&... args);
+explicit any(in_place_type_t<ValueType>, Args&&... args);
 #+END_SRC
+
+#+BEGIN_NOTES
+All these new vocabulary types have constructors that take ~in_place~ tag
+arguments. They work similarly to ~piecewise_construct~ but they're only
+constructing one thing.
+#+END_NOTES
+
+** ~optional~ construction
+
+implicit constructor
+#+BEGIN_SRC c++
+optional<S> opt = Foo{};
+#+END_SRC
+
+~explicit~ constructor (naive method)
+#+BEGIN_SRC c++
+optional<S> opt = S{1};
+#+END_SRC
+
+~explicit~ constructor (in-place method)
+#+BEGIN_SRC c++
+optional<S> opt(in_place, 1);
+#+END_SRC
+
+#+BEGIN_NOTES
+In the first case, it's fine: just one in-place construct.
+
+In the second case, we have an ~explicit~ constructor. So if we use this style,
+we get a construct and a move.
+
+The third case is the way to go for in-place construction. It can also be used
+with an implicit constructor of course.
+#+END_NOTES
+
+** ~optional~ assignment
+
+implicit constructor
+#+BEGIN_SRC c++
+optional<S> opt;
+opt = Foo{};
+#+END_SRC
+
+~explicit~ constructor (naive method)
+#+BEGIN_SRC c++
+optional<S> opt;
+opt = S{1};
+#+END_SRC
+
+~explicit~ constructor (in-place method)
+#+BEGIN_SRC c++
+optional<S> opt;
+opt.emplace(1);
+#+END_SRC
+
+#+BEGIN_NOTES
+Similar story here.
+#+END_NOTES
+
+** ~optional~ recommendations
+
+ - use the ~in_place_t~ constructor
+ - use ~=~ for assignment, but avoid ~explicit~ construction
+ - use ~emplace~ for assignment
+
+#+BEGIN_SRC c++
+optional<S> opt(in_place, 1);
+opt = Foo{};
+opt.emplace(2);
+#+END_SRC
+
+#+BEGIN_NOTES
+You'll never go wrong with these.
+#+END_NOTES
+
+** ~variant~ construction
+
+implicit constructor
+#+BEGIN_SRC c++
+variant<int, S> v = Foo{};
+#+END_SRC
+
+~explicit~ constructor (naive method)
+#+BEGIN_SRC c++
+variant<int, S> v = S{1};
+#+END_SRC
+
+~explicit~ constructor (oops method)
+#+BEGIN_SRC c++
+variant<int, S> v = 1;
+#+END_SRC
+
+#+BEGIN_NOTES
+Similar story as ~optional~.
+
+But there is the potential for a bug with the ~explicit~ constructor. What makes
+this somewhat likely is that it might be the case that someone makes a
+constructor explicit later on.
+#+END_NOTES
+
+** ~variant~ construction
+
+Recommendation: use either of these two constructions.
+
+#+BEGIN_SRC c++
+variant<int, S> v(in_place_type<S>, 1);
+#+END_SRC
+
+#+BEGIN_SRC c++
+variant<int, S> v(in_place_index<1>, 1);
+#+END_SRC
+
+#+BEGIN_NOTES
+I would generally prefer the first except in cases where the same type occurs in
+multiple places in the ~variant~, which is relatively rarer.
+#+END_NOTES
+
+** ~variant~ assignment
+
+Similar story to construction.
+
+#+BEGIN_SRC c++
+variant<int, S> v;
+
+v = Foo{}; // fine
+v = S{1};  // constructs a temporary
+v = 1;     // oops
+#+END_SRC
+
+** ~variant~ danger!
+
+Implicitly-typed ~variant~ construction/assignment can be dangerous.
+
+#+BEGIN_SRC c++
+std::variant<bool, std::string> v = "Hello";
+cout << "index is " << v.index() << '\n';
+#+END_SRC
+
+What does this output?
+
+#+BEGIN_NOTES
+Avoid implicit type conversions. They're dangerous. The first possible one will apply.
+#+END_NOTES
+
+** Safe, efficient ~variant~ assignment
+
+#+BEGIN_SRC c++
+std::variant<int, S> v;
+// template <class T, class... Args>
+// T& emplace(Args&&... args);
+v.emplace<1>(1);  // S{1}
+#+END_SRC
+
+#+BEGIN_SRC c++
+std::variant<int, S> v;
+// template <size_t I, class... Args>
+// variant_alternative_t<I, variant>& emplace(Args&&... args);
+v.emplace<S>(1);  // S{1}
+#+END_SRC
+
+** ~variant~ recommendations
+
+ - always be explicit about types
+ - use ~in_place_type~ or ~in_place_index~ constructors
+ - use ~emplace~
+ - avoid ~operator=~ (except actual ~variant~-to-~variant~)
+
+#+BEGIN_NOTES
+Obviously ~operator=~ is used implicitly by the compiler.
+#+END_NOTES
+
+* 7. Final Guidelines and Recommendations
+
+Think about copies and moves.
+
+Moves aren't free, and may not be cheap.
+
+Usually, in-place construction is preferable. And it is nearly always possible.
+
+Know how RVO works, and check that the compiler is doing it when you think it is.
+
+Beware ~initializer_list~.
+
+Feel free to ping me with any questions, any time.
