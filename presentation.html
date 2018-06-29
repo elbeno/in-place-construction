@@ -27,13 +27,13 @@
 <body>
 <div class="reveal">
 <div class="slides">
-<section id="sec-title-slide"><h2>Everyday Efficiency: In-place Construction</h2><div class='vertspace2'></div><blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote><div class='vertspace3'></div><h3>Ben Deane / <a href="mailto:bdeane@blizzard.com">bdeane@blizzard.com</a> / <a href="http://twitter.com/ben_deane">@ben_deane</a></h3><h4>July 2018</h4>
+<section id="sec-title-slide"><h2>Everyday Efficiency: In-place Construction</h2><div class='vertspace2'></div><blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote><div class='vertspace3'></div><h3>Ben Deane / <a href="mailto:bdeane@blizzard.com">bdeane@blizzard.com</a></h3><h4>13th July 2018</h4>
 </section>
 <script type="text/javascript" src="./presentation.js"></script>
 
 <section>
-<section id="slide-orgf486e40">
-<h2 id="orgf486e40">Get Ready</h2>
+<section id="slide-org2d26622">
+<h2 id="org2d26622">Get Ready</h2>
 <ol>
 <li>What happens when we <code>move</code> something?</li>
 <li>Copy elision (RVO)</li>
@@ -69,8 +69,8 @@ namespaces from the slides for brevity.
 </section>
 </section>
 <section>
-<section id="slide-orgbe5823c">
-<h2 id="orgbe5823c">Disclaimer</h2>
+<section id="slide-org4388584">
+<h2 id="org4388584">Disclaimer</h2>
 <p>
 I'm going to critique some code in this talk.
 </p>
@@ -90,8 +90,8 @@ Let's make code better together!
 </section>
 </section>
 <section>
-<section id="slide-orgf31b0f9">
-<h2 id="orgf31b0f9">Preliminaries</h2>
+<section id="slide-orgedac9e6">
+<h2 id="orgedac9e6">Preliminaries</h2>
 <iframe width="1400px" height="600px" src="https://godbolt.org/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.5479341055999998,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Implicit+value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A%7D%3B%0A%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:61.43386897404203,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((h:compiler,i:(compiler:clang_trunk,filters:(b:'0',binary:'1',commentOnly:'0',demangle:'0',directives:'0',execute:'1',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'x86-64+clang+(trunk)+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),k:38.56613102595797,l:'4',n:'0',o:'',s:0,t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 <aside class="notes">
@@ -105,8 +105,8 @@ snippets of code behave.
 </section>
 </section>
 <section>
-<section id="slide-org7785008">
-<h2 id="org7785008">1. What happens when we <code>move</code> something?</h2>
+<section id="slide-orgb673a72">
+<h2 id="orgb673a72">1. What happens when we <code>move</code> something?</h2>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">vector</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v1</span> = <span style="color: #707183;">{</span><span style="color: #008b8b;">1</span>, <span style="color: #008b8b;">2</span>, <span style="color: #008b8b;">3</span>, <span style="color: #008b8b;">4</span>, <span style="color: #008b8b;">5</span><span style="color: #707183;">}</span>;
@@ -133,8 +133,8 @@ basically? (pointer-to-buffer, size, capacity). On destruction, what must it do?
 </aside>
 
 </section>
-<section id="slide-org9f06bf3">
-<h3 id="org9f06bf3">A moved-from <code>vector</code></h3>
+<section id="slide-org927db27">
+<h3 id="org927db27">A moved-from <code>vector</code></h3>
 <p>
 It must be destroyable.
 </p>
@@ -150,8 +150,8 @@ What is sufficient? What is likely?
 </ul>
 
 </section>
-<section id="slide-org1e6c1fb">
-<h3 id="org1e6c1fb">Exhibit A</h3>
+<section id="slide-org836ea21">
+<h3 id="org836ea21">Exhibit A</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #008b8b;">WebSocketHandshakerImpl</span>::<span style="color: #0000ff;">ProcessServerHandshake</span><span style="color: #707183;">(</span><span style="color: #228b22;">HttpMessage</span> <span style="color: #a0522d;">message</span><span style="color: #707183;">)</span>
@@ -169,15 +169,8 @@ This code assumes that it's safe to do whatever comes later to a moved-from <cod
 </p>
 
 </section>
-<section id="slide-orga22ba68">
-<h3 id="orga22ba68">Now consider:</h3>
-<div class="org-src-container">
-
-<pre  class="src src-c++"><span style="color: #228b22;">string</span> <span style="color: #a0522d;">s1</span> = <span style="color: #b22222;">"Hello, world"</span>;
-<span style="color: #228b22;">string</span> <span style="color: #a0522d;">s2</span> = move<span style="color: #707183;">(</span>s1<span style="color: #707183;">)</span>;
-</pre>
-</div>
-
+<section id="slide-org11e25d1">
+<h3 id="org11e25d1">Now consider:</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">string</span> <span style="color: #a0522d;">s1</span> = <span style="color: #b22222;">"Greetings, planet"</span>;
@@ -187,6 +180,17 @@ This code assumes that it's safe to do whatever comes later to a moved-from <cod
 
 <p>
 What's the moved-from state of <code>s1</code>?
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #228b22;">string</span> <span style="color: #a0522d;">s3</span> = <span style="color: #b22222;">"Hello, world"</span>;
+<span style="color: #228b22;">string</span> <span style="color: #a0522d;">s4</span> = move<span style="color: #707183;">(</span>s3<span style="color: #707183;">)</span>;
+</pre>
+</div>
+
+<p>
+What's the moved-from state of <code>s3</code>?
 </p>
 
 <aside class="notes">
@@ -216,8 +220,8 @@ Bloomberg's STL does not clear a moved-from SSO string.
 </aside>
 
 </section>
-<section id="slide-org91d1de6">
-<h3 id="org91d1de6">Observation</h3>
+<section id="slide-org42f753e">
+<h3 id="org42f753e">Observation</h3>
 <p>
 Moving from a <code>string</code> usually <i>isn't any faster</i> than copying from it.
 </p>
@@ -243,8 +247,8 @@ And as noted, it may be technically slower.
 </aside>
 
 </section>
-<section id="slide-orge9e0993">
-<h3 id="orge9e0993">Exhibit B</h3>
+<section id="slide-org43394a4">
+<h3 id="org43394a4">Exhibit B</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #008b8b;">Context</span>::<span style="color: #0000ff;">Trigger</span><span style="color: #707183;">(</span><span style="color: #006400;">/* </span><span style="color: #006400;">some args */</span><span style="color: #707183;">)</span>
@@ -281,8 +285,8 @@ with a small-buffer optimizable container?
 </aside>
 
 </section>
-<section id="slide-org6b526f0">
-<h3 id="org6b526f0">Guideline (specific)</h3>
+<section id="slide-org3b04e4a">
+<h3 id="org3b04e4a">Guideline (specific)</h3>
 <p>
 Don't assume things are empty after a <code>move</code>.
 </p>
@@ -305,8 +309,8 @@ Make your code safe for future small-buffer optimizations.
 </p>
 
 </section>
-<section id="slide-org86f8a69">
-<h3 id="org86f8a69">Guideline (more general)</h3>
+<section id="slide-orgbe48194">
+<h3 id="orgbe48194">Guideline (more general)</h3>
 <p>
 If you didn't write the move constructor/operator yourself, after a <code>move</code>, you
 may assume:
@@ -344,8 +348,8 @@ and safer.
 </aside>
 
 </section>
-<section id="slide-org39f39f5">
-<h3 id="org39f39f5">Let's look at this again</h3>
+<section id="slide-orgf3a41e3">
+<h3 id="orgf3a41e3">Let's look at this again</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #008b8b;">WebSocketHandshakerImpl</span>::<span style="color: #0000ff;">ProcessServerHandshake</span><span style="color: #707183;">(</span><span style="color: #228b22;">HttpMessage</span> <span style="color: #a0522d;">message</span><span style="color: #707183;">)</span>
@@ -388,8 +392,8 @@ So what would "prevent it"?
 </aside>
 
 </section>
-<section id="slide-org7f3d7d1">
-<h3 id="org7f3d7d1">There may be trouble ahead</h3>
+<section id="slide-org6081b66">
+<h3 id="org6081b66">There may be trouble ahead</h3>
 <p>
 Let's say we want always want pretty much the same headers for all requests.
 </p>
@@ -431,8 +435,8 @@ The HttpMessage itself can be an rvalue, but what it's referencing isn't.
 </aside>
 
 </section>
-<section id="slide-orgfb5bb16">
-<h3 id="orgfb5bb16">Guideline</h3>
+<section id="slide-org3ee7e66">
+<h3 id="org3ee7e66">Guideline</h3>
 <p>
 Use <code>move(obj).member</code> rather than <code>move(obj.member)</code>
 </p>
@@ -456,8 +460,8 @@ ref, no problem. We aren't losing anything and we're gaining safety.
 </aside>
 
 </section>
-<section id="slide-org66f6c61">
-<h3 id="org66f6c61"><code>move</code> safety guidelines</h3>
+<section id="slide-org2631114">
+<h3 id="org2631114"><code>move</code> safety guidelines</h3>
 <ul>
 <li>after <code>move</code>, destroy or assign <i>only</i></li>
 <li>use <code>exchange</code> to move-and-clear</li>
@@ -476,8 +480,8 @@ constructors. You're going to be working in terms of the subobjects.
 </section>
 </section>
 <section>
-<section id="slide-orge1c7a5b">
-<h2 id="orge1c7a5b">2. Copy Elision (RVO)</h2>
+<section id="slide-orgff991c5">
+<h2 id="orgff991c5">2. Copy Elision (RVO)</h2>
 <p>
 What is the return value optimization?
 </p>
@@ -516,8 +520,8 @@ when foo() calls bar() it "passes" the address of the stack variable s.
 </aside>
 
 </section>
-<section id="slide-orgd133777">
-<h3 id="orgd133777">RVO in pictures: No RVO</h3>
+<section id="slide-orge1c29bc">
+<h3 id="orge1c29bc">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -527,8 +531,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org25d9075">
-<h3 id="org25d9075">RVO in pictures: No RVO</h3>
+<section id="slide-org1e938ad">
+<h3 id="org1e938ad">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -538,8 +542,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org1e58c06">
-<h3 id="org1e58c06">RVO in pictures: No RVO</h3>
+<section id="slide-orgb30194a">
+<h3 id="orgb30194a">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -549,8 +553,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org035e86f">
-<h3 id="org035e86f">RVO in pictures: No RVO</h3>
+<section id="slide-org400079c">
+<h3 id="org400079c">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -560,8 +564,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org8a84ac2">
-<h3 id="org8a84ac2">RVO in pictures: No RVO</h3>
+<section id="slide-org52e47fe">
+<h3 id="org52e47fe">RVO in pictures: No RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -571,8 +575,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orgb1bd5d6">
-<h3 id="orgb1bd5d6">RVO in pictures: RVO</h3>
+<section id="slide-org6050fc3">
+<h3 id="org6050fc3">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -582,8 +586,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orgc46b028">
-<h3 id="orgc46b028">RVO in pictures: RVO</h3>
+<section id="slide-org8bbc573">
+<h3 id="org8bbc573">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -593,8 +597,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org7bc8eac">
-<h3 id="org7bc8eac">RVO in pictures: RVO</h3>
+<section id="slide-org8501dd0">
+<h3 id="org8501dd0">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -604,8 +608,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org76e0e57">
-<h3 id="org76e0e57">RVO in pictures: RVO</h3>
+<section id="slide-orgc127b16">
+<h3 id="orgc127b16">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -615,8 +619,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-org1b6ce12">
-<h3 id="org1b6ce12">RVO in pictures: RVO</h3>
+<section id="slide-org6490560">
+<h3 id="org6490560">RVO in pictures: RVO</h3>
 <div class='vertspace2'></div>
 
 <div class="figure">
@@ -626,8 +630,8 @@ Sorry, your browser does not support SVG.</object>
 </div>
 
 </section>
-<section id="slide-orga8cd87b">
-<h3 id="orga8cd87b">When can RVO not apply?</h3>
+<section id="slide-org9b461a1">
+<h3 id="org9b461a1">When can RVO not apply?</h3>
 <p>
 RVO Rules: what is returned has to be either:
 </p>
@@ -639,8 +643,8 @@ RVO Rules: what is returned has to be either:
 </ul>
 
 </section>
-<section id="slide-org21731a9">
-<h3 id="org21731a9">When can RVO not apply?</h3>
+<section id="slide-org87d5b35">
+<h3 id="org87d5b35">When can RVO not apply?</h3>
 <p>
 RVO Ability: sometimes, the callee <i>can't</i> construct the object in-place.
 </p>
@@ -666,8 +670,8 @@ variable in order to RVO it.
 </aside>
 
 </section>
-<section id="slide-orgdc66af2">
-<h3 id="orgdc66af2">No RVO because no opportunity</h3>
+<section id="slide-org451426f">
+<h3 id="org451426f">No RVO because no opportunity</h3>
 <p>
 You can't RVO a variable if you didn't get the chance to construct it in the
 first place.
@@ -694,8 +698,8 @@ as a last resort.
 </aside>
 
 </section>
-<section id="slide-orgcf3441b">
-<h3 id="orgcf3441b">No RVO because wrong type, 1</h3>
+<section id="slide-org1b45062">
+<h3 id="org1b45062">No RVO because wrong type, 1</h3>
 <p>
 An rvalue-ref is not the same type.
 </p>
@@ -725,8 +729,8 @@ member variable out of a rvalue-ref-qualified member function.
 </aside>
 
 </section>
-<section id="slide-org9b93e7c">
-<h3 id="org9b93e7c">No RVO because wrong type, 2</h3>
+<section id="slide-orga73e50c">
+<h3 id="orga73e50c">No RVO because wrong type, 2</h3>
 <p>
 Factory functions can't RVO.
 </p>
@@ -754,8 +758,8 @@ e.g. returning a pair when the function returns a tuple, or something like that.
 </aside>
 
 </section>
-<section id="slide-orgaf331fd">
-<h3 id="orgaf331fd">No RVO because not enough info</h3>
+<section id="slide-orge97038e">
+<h3 id="orge97038e">No RVO because not enough info</h3>
 <p>
 It has to be decidable at construction time.
 </p>
@@ -779,8 +783,43 @@ Again, return value will still be moved.
 </p>
 
 </section>
-<section id="slide-org14bde68">
-<h3 id="org14bde68">Quiz time</h3>
+<section id="slide-orgc34aea4">
+<h3 id="orgc34aea4">Why is RVO important?</h3>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">M</span> = <span style="color: #228b22;">map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">string</span>, <span style="color: #228b22;">int</span><span style="color: #707183;">&gt;</span>;
+
+<span style="color: #228b22;">M</span> <span style="color: #0000ff;">build_map</span><span style="color: #707183;">()</span>
+<span style="color: #707183;">{</span>
+  <span style="color: #228b22;">M</span> <span style="color: #a0522d;">m</span>;
+  m.insert<span style="color: #7388d6;">(</span>make_pair<span style="color: #909183;">(</span><span style="color: #b22222;">"Jenny"</span>, <span style="color: #008b8b;">8</span><span style="color: #008b8b; background-color: #eeeeee; font-weight: bold; text-decoration: underline;">675</span><span style="color: #008b8b;">309</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span>;
+  <span style="color: #a020f0;">return</span> m;
+<span style="color: #707183;">}</span>
+</pre>
+</div>
+
+<aside class="notes">
+<p>
+RVO is really important for performance. It's probably the single most important
+optimization compilers make. Hence why it's been around for decades, even
+without a standard.
+</p>
+
+<p>
+If we accidentally inhibit RVO, we might also inhibit <code>move</code>. We might get a
+copy.
+</p>
+
+<p>
+<code>move</code> isn't necessarily cheap. Microsoft's node-based containers allocate in
+their move constructors because they use sentinel nodes.
+</p>
+
+</aside>
+
+</section>
+<section id="slide-orga157498">
+<h3 id="orga157498">Quiz time</h3>
 <p>
 Wake up!
 </p>
@@ -790,8 +829,8 @@ And tell me if the upcoming code snippets will activate RVO.
 </p>
 
 </section>
-<section id="slide-orgb13b50b">
-<h3 id="orgb13b50b">Will it RVO?</h3>
+<section id="slide-org390bb98">
+<h3 id="org390bb98">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">const</span> <span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">()</span>
@@ -817,8 +856,8 @@ But don't do this. The compiler ignores const-qualified builtin types anyway.
 </aside>
 
 </section>
-<section id="slide-org5f7c1e6">
-<h3 id="org5f7c1e6">Will it RVO?</h3>
+<section id="slide-org5f5ca35">
+<h3 id="org5f5ca35">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -843,8 +882,8 @@ Yes. This is URVO, and works pretty reliably even in debug builds.
 </aside>
 
 </section>
-<section id="slide-org6e7af16">
-<h3 id="org6e7af16">Will it RVO?</h3>
+<section id="slide-orga211b90">
+<h3 id="orga211b90">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span>, <span style="color: #228b22;">S</span> <span style="color: #a0522d;">s</span><span style="color: #707183;">)</span>
@@ -868,8 +907,8 @@ No - can't RVO a function parameter. It will move though.
 </aside>
 
 </section>
-<section id="slide-orge3f0281">
-<h3 id="orge3f0281">Will it RVO?</h3>
+<section id="slide-orgf6f51ef">
+<h3 id="orgf6f51ef">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">get_S</span><span style="color: #707183;">()</span> <span style="color: #707183;">{</span> <span style="color: #a020f0;">return</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>; <span style="color: #707183;">}</span>
@@ -896,8 +935,8 @@ RVO is allowed to elide multiple copies.
 </aside>
 
 </section>
-<section id="slide-orgc2f1602">
-<h3 id="orgc2f1602">Will it RVO?</h3>
+<section id="slide-org37a208d">
+<h3 id="org37a208d">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -924,8 +963,8 @@ There's nothing stopping it&#x2026; but only Clang successfully RVO's this.
 </aside>
 
 </section>
-<section id="slide-org798fd7e">
-<h3 id="org798fd7e">Will it RVO?</h3>
+<section id="slide-orgde303d3">
+<h3 id="orgde303d3">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -958,8 +997,8 @@ It still moves.
 </aside>
 
 </section>
-<section id="slide-org00ea720">
-<h3 id="org00ea720">Will it RVO?</h3>
+<section id="slide-orga56915b">
+<h3 id="orga56915b">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">(</span><span style="color: #228b22;">bool</span> <span style="color: #a0522d;">b</span><span style="color: #707183;">)</span>
@@ -992,8 +1031,8 @@ This is perhaps a semi-common pattern that defeats RVO!
 </aside>
 
 </section>
-<section id="slide-org59b7b9b">
-<h3 id="org59b7b9b">Will it RVO?</h3>
+<section id="slide-orgb5691e7">
+<h3 id="orgb5691e7">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">get_S</span><span style="color: #707183;">()</span> <span style="color: #707183;">{</span> <span style="color: #a020f0;">return</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>; <span style="color: #707183;">}</span>
@@ -1018,8 +1057,8 @@ its operands are prvalues.
 </aside>
 
 </section>
-<section id="slide-org46951b9">
-<h3 id="org46951b9">Will it RVO?</h3>
+<section id="slide-orgfc1d8f2">
+<h3 id="orgfc1d8f2">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">()</span>
@@ -1043,8 +1082,8 @@ Yep. Plain NRVO.
 </aside>
 
 </section>
-<section id="slide-orgde1bafb">
-<h3 id="orgde1bafb">Will it RVO?</h3>
+<section id="slide-org1053d73">
+<h3 id="org1053d73">Will it RVO?</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">will_it_rvo</span><span style="color: #707183;">()</span>
@@ -1077,8 +1116,8 @@ RVO. It does in C++11 mode, just not in C++14 or C++17 mode.
 </aside>
 
 </section>
-<section id="slide-org60d7ad0">
-<h3 id="org60d7ad0">Exhibit C</h3>
+<section id="slide-org73a46fa">
+<h3 id="org73a46fa">Exhibit C</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">unsigned</span> <span style="color: #228b22;">long</span> <span style="color: #228b22;">long</span> <span style="color: #0000ff;">Time</span><span style="color: #707183;">()</span> <span style="color: #a020f0;">const</span> <span style="color: #a020f0;">override</span>
@@ -1115,8 +1154,8 @@ pattern gets copied&#x2026;
 </aside>
 
 </section>
-<section id="slide-org44159f6">
-<h3 id="org44159f6">Guidelines for RVO-friendliness</h3>
+<section id="slide-org1c64ef6">
+<h3 id="org1c64ef6">Guidelines for RVO-friendliness</h3>
 <ul>
 <li>don't const-qualify returned value types</li>
 <li>almost never return <code>move(x)</code></li>
@@ -1129,6 +1168,10 @@ pattern gets copied&#x2026;
 <aside class="notes">
 <p>
 First point does not affect RVO but is generally useless.
+</p>
+
+<p>
+Returning <code>move(x)</code> is only for ref-qualified accessors.
 </p>
 
 <p>
@@ -1145,8 +1188,8 @@ Beware of the conditional operator.
 </section>
 </section>
 <section>
-<section id="slide-org22e1794">
-<h2 id="org22e1794">3. Putting stuff into a <code>vector</code></h2>
+<section id="slide-org398d659">
+<h2 id="org398d659">3. Putting stuff into a <code>vector</code></h2>
 <p>
 Should you use <code>push_back</code> or should you use <code>emplace_back</code>?
 </p>
@@ -1156,8 +1199,8 @@ How should you use them?
 </p>
 
 </section>
-<section id="slide-orgdd102af">
-<h3 id="orgdd102af"><code>push_back</code> and <code>emplace_back</code></h3>
+<section id="slide-org90aef5b">
+<h3 id="org90aef5b"><code>push_back</code> and <code>emplace_back</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">void</span> <span style="color: #0000ff;">push_back</span><span style="color: #707183;">(</span><span style="color: #a020f0;">const</span> <span style="color: #228b22;">T</span>&amp; <span style="color: #a0522d;">x</span><span style="color: #707183;">)</span>;
@@ -1180,8 +1223,8 @@ Until C++17, <code>emplace_back</code> returns <code>void</code>.
 </aside>
 
 </section>
-<section id="slide-org9e6c580">
-<h3 id="org9e6c580">Example 1</h3>
+<section id="slide-orgc552b66">
+<h3 id="orgc552b66">Example 1</h3>
 <p>
 What's the difference here?
 </p>
@@ -1205,8 +1248,8 @@ There is no difference.
 </aside>
 
 </section>
-<section id="slide-orgb2b49df">
-<h3 id="orgb2b49df">Example 1.1</h3>
+<section id="slide-org23164fd">
+<h3 id="org23164fd">Example 1.1</h3>
 <p>
 What's the difference here?
 </p>
@@ -1231,8 +1274,8 @@ If we want to capture a reference to the thing that was pushed, we can use
 </aside>
 
 </section>
-<section id="slide-org5af3a23">
-<h3 id="org5af3a23">Example 2</h3>
+<section id="slide-orgf1ff046">
+<h3 id="orgf1ff046">Example 2</h3>
 <p>
 What's the difference here?
 </p>
@@ -1264,8 +1307,8 @@ Remember, for string, a move is usually as expensive as a copy.
 </aside>
 
 </section>
-<section id="slide-orgbf64d76">
-<h3 id="orgbf64d76">Example 2.1</h3>
+<section id="slide-orgeb1c3ac">
+<h3 id="orgeb1c3ac">Example 2.1</h3>
 <p>
 Default in-place construct.
 </p>
@@ -1294,8 +1337,8 @@ Default in-place construct.
 </aside>
 
 </section>
-<section id="slide-org4b48460">
-<h3 id="org4b48460">Example 3</h3>
+<section id="slide-orgff22d51">
+<h3 id="orgff22d51">Example 3</h3>
 <p>
 In-place construct with <code>explicit</code> constructor.
 </p>
@@ -1325,8 +1368,8 @@ v.push_back<span style="color: #707183;">(</span><span style="color: #008b8b;">1
 </aside>
 
 </section>
-<section id="slide-orgff8842c">
-<h3 id="orgff8842c">Example: copy</h3>
+<section id="slide-org3d88409">
+<h3 id="org3d88409">Example: copy</h3>
 <p>
 Recall: our <code>S</code> class has a constructor from <code>Foo</code>, and an <code>explicit</code> constructor
 from <code>int</code>.
@@ -1355,8 +1398,8 @@ the <code>vector</code>.
 </aside>
 
 </section>
-<section id="slide-org5c217fa">
-<h3 id="org5c217fa">Example: copy</h3>
+<section id="slide-org1ea568e">
+<h3 id="org1ea568e">Example: copy</h3>
 <p>
 What if we have an <code>array</code> of <code>int</code>?
 </p>
@@ -1384,8 +1427,8 @@ constructor.
 </aside>
 
 </section>
-<section id="slide-org6963e80">
-<h3 id="org6963e80">Example: copy?</h3>
+<section id="slide-org514754c">
+<h3 id="org514754c">Example: copy?</h3>
 <p>
 OK, no problem, right?
 </p>
@@ -1415,8 +1458,8 @@ But what we actually want to do is construct in place.
 </aside>
 
 </section>
-<section id="slide-org64e1bd8">
-<h3 id="org64e1bd8"><code>back_emplacer</code></h3>
+<section id="slide-org6babdcb">
+<h3 id="org6babdcb"><code>back_emplacer</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">Container</span><span style="color: #707183;">&gt;</span>
@@ -1440,8 +1483,8 @@ But what we actually want to do is construct in place.
 </div>
 
 </section>
-<section id="slide-org29197a7">
-<h3 id="org29197a7"><code>back_emplacer</code></h3>
+<section id="slide-orgc9b3e4e">
+<h3 id="orgc9b3e4e"><code>back_emplacer</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">Container</span><span style="color: #707183;">&gt;</span>
@@ -1453,8 +1496,8 @@ But what we actually want to do is construct in place.
 </div>
 
 </section>
-<section id="slide-org0192d60">
-<h3 id="org0192d60"><code>back_emplacer</code></h3>
+<section id="slide-org646f4e2">
+<h3 id="org646f4e2"><code>back_emplacer</code></h3>
 <p>
 What if we have an <code>array</code> of <code>int</code>?
 </p>
@@ -1474,8 +1517,8 @@ Now it works. And constructs in place.
 </p>
 
 </section>
-<section id="slide-orgb318c02">
-<h3 id="orgb318c02">Exhibit D</h3>
+<section id="slide-orga652642">
+<h3 id="orga652642">Exhibit D</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #008b8b;">blz</span>::<span style="color: #228b22;">vector</span><span style="color: #707183;">&lt;</span><span style="color: #008b8b;">blz</span>::string_view<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">tokens</span>;
@@ -1500,8 +1543,8 @@ A few things here:
 </aside>
 
 </section>
-<section id="slide-org23576a8">
-<h3 id="org23576a8">Exhibit E</h3>
+<section id="slide-org91a8838">
+<h3 id="org91a8838">Exhibit E</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++">context-&gt;m_result-&gt;m_headers.emplace_back<span style="color: #707183;">(</span>string<span style="color: #7388d6;">(</span>headerData, numBytes<span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>;
@@ -1530,8 +1573,8 @@ And remember, likely a superfluous copy if the string is small-buffer-optimized.
 </aside>
 
 </section>
-<section id="slide-org0fc95db">
-<h3 id="org0fc95db"><code>vector</code> of <code>pair</code> = <code>map</code></h3>
+<section id="slide-orga407e97">
+<h3 id="orga407e97"><code>vector</code> of <code>pair</code> = <code>map</code></h3>
 <p>
 Sometimes, we use a  sorted <code>vector</code> of <code>pair</code> as a replacement for <code>map</code>.
 </p>
@@ -1558,8 +1601,8 @@ v.emplace_back<span style="color: #707183;">(</span> <span style="color: #006400
 </div>
 
 </section>
-<section id="slide-org8280e9f">
-<h3 id="org8280e9f"><code>piecewise_construct</code> to the rescue!</h3>
+<section id="slide-orga956aa4">
+<h3 id="orga956aa4"><code>piecewise_construct</code> to the rescue!</h3>
 <p>
 <code>pair</code> has a constructor that will handle your multi-argument constructor.
 </p>
@@ -1581,8 +1624,8 @@ v.emplace_back<span style="color: #707183;">(</span> <span style="color: #006400
 </p>
 
 </section>
-<section id="slide-org8e5b398">
-<h3 id="org8e5b398">Using <code>piecewise_construct</code></h3>
+<section id="slide-orgd5d0e5b">
+<h3 id="orgd5d0e5b">Using <code>piecewise_construct</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">struct</span> <span style="color: #228b22;">Foo</span> <span style="color: #707183;">{</span> <span style="color: #0000ff;">Foo</span><span style="color: #7388d6;">(</span><span style="color: #228b22;">int</span>, <span style="color: #228b22;">string</span>, <span style="color: #228b22;">double</span><span style="color: #7388d6;">)</span>; <span style="color: #707183;">}</span>;
@@ -1594,9 +1637,9 @@ v.push_back<span style="color: #707183;">(</span>make_pair<span style="color: #7
 
 <span style="color: #006400;">// </span><span style="color: #006400;">...we can do this</span>
 v.emplace_back<span style="color: #707183;">(</span>
-  make_pair<span style="color: #7388d6;">(</span>piecewise_construct,
-            forward_as_tuple<span style="color: #909183;">(</span><span style="color: #008b8b;">1</span><span style="color: #909183;">)</span>,                   <span style="color: #006400;">// </span><span style="color: #006400;">args to int "constructor"</span>
-            forward_as_tuple<span style="color: #909183;">(</span><span style="color: #008b8b;">42</span>, <span style="color: #b22222;">"hello"</span>, <span style="color: #008b8b;">3.14</span><span style="color: #909183;">)</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">args to Foo constructor</span>
+  piecewise_construct,
+  forward_as_tuple<span style="color: #7388d6;">(</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">)</span>,                   <span style="color: #006400;">// </span><span style="color: #006400;">args to int "constructor"</span>
+  forward_as_tuple<span style="color: #7388d6;">(</span><span style="color: #008b8b;">42</span>, <span style="color: #b22222;">"hello"</span>, <span style="color: #008b8b;">3.14</span><span style="color: #7388d6;">)</span><span style="color: #707183;">)</span><span style="color: #88090B;">)</span>; <span style="color: #006400;">// </span><span style="color: #006400;">args to Foo constructor</span>
 </pre>
 </div>
 <p>
@@ -1604,8 +1647,8 @@ Perfect forwarding and in-place construction.
 </p>
 
 </section>
-<section id="slide-org60ec40d">
-<h3 id="org60ec40d">Recommendations</h3>
+<section id="slide-org2419787">
+<h3 id="org2419787">Recommendations</h3>
 <ul>
 <li><code>push_back</code> is perfectly fine for rvalues</li>
 <li>use <code>emplace_back</code> only when you need its powers
@@ -1623,19 +1666,15 @@ Perfect forwarding and in-place construction.
 </section>
 </section>
 <section>
-<section id="slide-org27761cb">
-<h2 id="org27761cb">4. <code>initializer_list</code></h2>
-<p>
-How does it work?
-</p>
-
-<p>
-What are its limits?
-</p>
+<section id="slide-org7df3ba4">
+<h2 id="org7df3ba4">4. <code>initializer_list</code></h2>
+<div class='vertspace2'></div>
+<blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p>
+<div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote>
 
 </section>
-<section id="slide-org8ab6dc4">
-<h3 id="org8ab6dc4">What is <code>initializer_list</code>?</h3>
+<section id="slide-org2e58887">
+<h3 id="org2e58887">What is <code>initializer_list</code>?</h3>
 <p>
 When you write:
 </p>
@@ -1662,8 +1701,8 @@ Notice: the backing array is <code>const</code>.
 </aside>
 
 </section>
-<section id="slide-orgd66ab42">
-<h3 id="orgd66ab42"><code>initializer_list</code> has <code>const</code> storage, 1</h3>
+<section id="slide-org9873c9b">
+<h3 id="org9873c9b"><code>initializer_list</code> has <code>const</code> storage, 1</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #0000ff;">...</span> <span style="color: #a0522d;">Is</span><span style="color: #707183;">&gt;</span>
@@ -1701,8 +1740,8 @@ contents.
 </aside>
 
 </section>
-<section id="slide-org3fd8ca8">
-<h3 id="org3fd8ca8"><code>initializer_list</code> has <code>const</code> storage, 2</h3>
+<section id="slide-org93da53d">
+<h3 id="org93da53d"><code>initializer_list</code> has <code>const</code> storage, 2</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">unique_ptr</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = <span style="color: #707183;">{</span> make_unique<span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #7388d6;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">)</span>, make_unique<span style="color: #7388d6;">&lt;</span><span style="color: #228b22;">int</span><span style="color: #7388d6;">&gt;(</span><span style="color: #008b8b;">2</span><span style="color: #7388d6;">)</span> <span style="color: #707183;">}</span>;
@@ -1728,8 +1767,8 @@ You can't move from an <code>initializer_list</code> - this won't compile.
 </aside>
 
 </section>
-<section id="slide-org515fa0a">
-<h3 id="org515fa0a">But they're so convenient!</h3>
+<section id="slide-org87a83a7">
+<h3 id="org87a83a7">But they're so convenient!</h3>
 <p>
 I'd much rather write:
 </p>
@@ -1772,8 +1811,8 @@ construction.
 </aside>
 
 </section>
-<section id="slide-org072a4a3">
-<h3 id="org072a4a3">We can make it a little better&#x2026;</h3>
+<section id="slide-orgfd3025d">
+<h3 id="orgfd3025d">We can make it a little better&#x2026;</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">vector</span><span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span> = <span style="color: #707183;">{</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>, S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">2</span><span style="color: #7388d6;">}</span>, S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">3</span><span style="color: #7388d6;">}</span> <span style="color: #707183;">}</span>;
@@ -1795,8 +1834,8 @@ construction.
 </p>
 
 </section>
-<section id="slide-orga76448d">
-<h3 id="orga76448d">What we really need&#x2026;</h3>
+<section id="slide-orge6bb1f5">
+<h3 id="orge6bb1f5">What we really need&#x2026;</h3>
 <p>
 Is an in-place constructor for <code>vector</code>. (For everything?)
 </p>
@@ -1817,8 +1856,8 @@ Future (?) proposal by Simon Brand.
 </p>
 
 </section>
-<section id="slide-orgd8bf897">
-<h3 id="orgd8bf897">Exhibit F</h3>
+<section id="slide-orgf0c7773">
+<h3 id="orgf0c7773">Exhibit F</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">unordered_set</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">string</span><span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">kKeywords</span> = <span style="color: #707183;">{</span>
@@ -1838,8 +1877,8 @@ Future (?) proposal by Simon Brand.
 </div>
 
 </section>
-<section id="slide-org972a15c">
-<h3 id="org972a15c">Caveat Constructor</h3>
+<section id="slide-org2d963b9">
+<h3 id="org2d963b9">Caveat Constructor</h3>
 <p>
 <code>string</code> is an interesting case here. We intuit/are taught:
 </p>
@@ -1855,8 +1894,8 @@ But that might hurt us with <code>string</code>.
 </p>
 
 </section>
-<section id="slide-org434d3b9">
-<h3 id="org434d3b9">Surprising: <code>string</code> vs <code>const char*</code></h3>
+<section id="slide-org9ce7145">
+<h3 id="org9ce7145">Surprising: <code>string</code> vs <code>const char*</code></h3>
 <p>
 SBO-strings
 <a href="http://quick-bench.com/5dPSX8rx-R8_BIUYbYOp6DcqhAc">http://quick-bench.com/5dPSX8rx-R8_BIUYbYOp6DcqhAc</a>
@@ -1893,8 +1932,8 @@ decay to a char*, we're going to call strlen at some point.
 </aside>
 
 </section>
-<section id="slide-org3b32806">
-<h3 id="org3b32806">Recommendations</h3>
+<section id="slide-org4865440">
+<h3 id="org4865440">Recommendations</h3>
 <ul>
 <li>use <code>initializer_list</code> only for literal types</li>
 <li>consider using <code>array</code> and manually moving</li>
@@ -1915,8 +1954,8 @@ I'm not sure what to recommend. Really the first point.
 </section>
 </section>
 <section>
-<section id="slide-org96c5a78">
-<h2 id="org96c5a78">5. Putting stuff into a <code>map</code></h2>
+<section id="slide-org842b5e6">
+<h2 id="org842b5e6">5. Putting stuff into a <code>map</code></h2>
 <p>
 (or other associative container)
 </p>
@@ -1931,11 +1970,17 @@ When I say <code>map</code>, I mean <code>map</code>, <code>unordered_map</code>
 etc, and also the various flavours of <code>set</code>.
 </p>
 
+<p>
+Note: the <code>value_type</code> of a <code>map</code> is <code>pair&lt;const K, V&gt;</code>. Confusingly, if we want
+to refer to just the value in the map and not the key, it's called the
+<code>mapped_type</code>.
+</p>
+
 </aside>
 
 </section>
-<section id="slide-org21190a1">
-<h3 id="org21190a1"><code>initializer_list</code> with <code>map</code></h3>
+<section id="slide-org374b37a">
+<h3 id="org374b37a"><code>initializer_list</code> with <code>map</code></h3>
 <p>
 It's perfectly possible to initialize a map with an <code>initializer_list</code>.
 </p>
@@ -1953,16 +1998,13 @@ Use aggregate initialization with <code>pair</code>.
 </p>
 
 <p>
-Suffers from the same problems as we saw earlier.
-</p>
-
-<p>
-And we can use the manual-array and move-iterator trick also.
+Is this good?
 </p>
 
 <aside class="notes">
 <p>
-Same as the <code>vector</code> init case basically.
+Same as the <code>vector</code> init case basically. <code>initializer_list</code> still suffers from
+the same problems.
 </p>
 
 <p>
@@ -1977,8 +2019,8 @@ If you have explicit constructors you might need to explicitly call out the type
 </aside>
 
 </section>
-<section id="slide-orgfeb0302">
-<h3 id="orgfeb0302">Alternative: templatery</h3>
+<section id="slide-org61d3d88">
+<h3 id="org61d3d88">Alternative: templatery</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">call an N-ary function on each lot of N args passed in</span>
@@ -2021,8 +2063,8 @@ This lambda deals with single-argument constructors for value. But&#x2026;
 
 
 </section>
-<section id="slide-orgec1194b">
-<h3 id="orgec1194b">Alternative: multi-arg templatery</h3>
+<section id="slide-org3e1918d">
+<h3 id="org3e1918d">Alternative: multi-arg templatery</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">call an N-ary function on each lot of N args passed in</span>
@@ -2050,18 +2092,23 @@ Everything constructed in place.
 Here we are calling S's two-arg constructor.
 </p>
 
+<p>
+<code>for_each_n_args</code> also works with vector (including vector-of-pair) as an
+alternative to <code>initializer_list</code>
+</p>
+
 </aside>
 
 </section>
-<section id="slide-org4500e63">
-<h3 id="org4500e63">Enough about initializing</h3>
+<section id="slide-orgbf902a1">
+<h3 id="orgbf902a1">Enough about initializing</h3>
 <p>
 How about putting things into an existing <code>map</code>?
 </p>
 
 </section>
-<section id="slide-orga39810a">
-<h3 id="orga39810a">The Easy Way: <code>operator[]</code></h3>
+<section id="slide-org895cd4e">
+<h3 id="org895cd4e">The Easy Way: <code>operator[]</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
@@ -2107,8 +2154,8 @@ a map, if you never use this function. And that can be a significant thing.
 </aside>
 
 </section>
-<section id="slide-org8817a95">
-<h3 id="org8817a95">The Other Easy Way: <code>insert</code></h3>
+<section id="slide-org4629e92">
+<h3 id="org4629e92">The Other Easy Way: <code>insert</code></h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
@@ -2154,15 +2201,16 @@ initial construct.
 </p>
 
 <p>
-The third line makes a pair&lt;int, int&gt; then uses that pair to construct a pair
-of &lt;int, S&gt; in the map.
+The third line makes a pair&lt;int, int&gt; then uses that pair to construct a pair of
+&lt;int, S&gt; in the map. This doesn't currently work with <code>blz</code>. I'll get to why in
+a minute.
 </p>
 
 </aside>
 
 </section>
-<section id="slide-org916fa17">
-<h3 id="org916fa17"><code>emplace</code></h3>
+<section id="slide-org52419b2">
+<h3 id="org52419b2"><code>emplace</code></h3>
 <p>
 Enter the <i>wonderful C++11 panacea</i> that is move semantics.
 </p>
@@ -2198,8 +2246,8 @@ Don't do this. It is <i>exactly</i> the same as <code>insert</code> here. Two mo
 </aside>
 
 </section>
-<section id="slide-orga9433b7">
-<h3 id="orga9433b7"><code>emplace</code>, better usage</h3>
+<section id="slide-org2406aa5">
+<h3 id="org2406aa5"><code>emplace</code>, better usage</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">recall S has an implicit constructor from Foo</span>
@@ -2228,8 +2276,8 @@ fine with rvalues.
 </aside>
 
 </section>
-<section id="slide-org5680113">
-<h3 id="org5680113"><code>emplace</code>: <code>blz</code> caveat</h3>
+<section id="slide-org3ca832a">
+<h3 id="org3ca832a"><code>emplace</code>: <code>blz</code> caveat</h3>
 <p>
 At the moment, <code>blz::map::emplace</code> cannot invoke <code>explicit</code> constructors.
 </p>
@@ -2251,8 +2299,8 @@ fix. It's been difficult to achieve cross-platform compiler support properly.
 </aside>
 
 </section>
-<section id="slide-org0abc5f9">
-<h3 id="org0abc5f9"><code>emplace</code> problem</h3>
+<section id="slide-orgb630ae4">
+<h3 id="orgb630ae4"><code>emplace</code> problem</h3>
 <p>
 What do we do when we want to default-construct the value?
 </p>
@@ -2288,8 +2336,8 @@ trying to construct.
 </aside>
 
 </section>
-<section id="slide-org8a1371f">
-<h3 id="org8a1371f"><code>emplace</code> with zero-arg constructor</h3>
+<section id="slide-org9d15e5c">
+<h3 id="org9d15e5c"><code>emplace</code> with zero-arg constructor</h3>
 <p>
 Our old friend <code>piecewise_construct</code> can help.
 </p>
@@ -2325,8 +2373,8 @@ This also gets around the <code>blz</code> limitation on <code>explicit</code> c
 </aside>
 
 </section>
-<section id="slide-org77507c1">
-<h3 id="org77507c1">Exhibit G</h3>
+<section id="slide-org26675cd">
+<h3 id="org26675cd">Exhibit G</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">explicit ClientIdRecord(</span>
@@ -2362,8 +2410,8 @@ One in-place construct. This is fine.
 </aside>
 
 </section>
-<section id="slide-orga981f2d">
-<h3 id="orga981f2d">Exhibit G</h3>
+<section id="slide-org368eee4">
+<h3 id="org368eee4">Exhibit G</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">explicit ClientIdRecord(</span>
@@ -2393,8 +2441,8 @@ How do we do better?
 </aside>
 
 </section>
-<section id="slide-org612bacb">
-<h3 id="org612bacb">Exhibit G</h3>
+<section id="slide-orgccb5f13">
+<h3 id="orgccb5f13">Exhibit G</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">using</span> <span style="color: #228b22;">Storage</span> = <span style="color: #228b22;">unordered_map</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">string</span>, ClientIdRecord<span style="color: #707183;">&gt;</span>;
@@ -2410,8 +2458,8 @@ Use <code>piecewise_construct</code> again.
 </p>
 
 </section>
-<section id="slide-org701893a">
-<h3 id="org701893a"><code>emplace</code> problem 2</h3>
+<section id="slide-org8e3b34f">
+<h3 id="org8e3b34f"><code>emplace</code> problem 2</h3>
 <p>
 What do you do if you want to <code>emplace</code> the result of a function call?
 </p>
@@ -2439,8 +2487,8 @@ Is it possible to in-place construct here?
 </p>
 
 </section>
-<section id="slide-org2a36ffb">
-<h3 id="org2a36ffb">In-place construct a function call result</h3>
+<section id="slide-org664216d">
+<h3 id="org664216d">In-place construct a function call result</h3>
 <p>
 We can't avoid evaluating the function call before calling <code>emplace</code>.
 </p>
@@ -2450,8 +2498,8 @@ But, we can control when the result of the function call becomes an <code>S</cod
 </p>
 
 </section>
-<section id="slide-orga8cadd4">
-<h3 id="orga8cadd4">In-place construct a function call result</h3>
+<section id="slide-org45c50c3">
+<h3 id="org45c50c3">In-place construct a function call result</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">F</span><span style="color: #707183;">&gt;</span>
@@ -2486,8 +2534,8 @@ result to an <code>S</code>.
 </aside>
 
 </section>
-<section id="slide-org84a3443">
-<h3 id="org84a3443"><code>emplace</code> problem 2</h3>
+<section id="slide-orgf578bfd">
+<h3 id="orgf578bfd"><code>emplace</code> problem 2</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">S</span> <span style="color: #0000ff;">get_S</span><span style="color: #707183;">()</span> <span style="color: #707183;">{</span> <span style="color: #a020f0;">return</span> S<span style="color: #7388d6;">{</span><span style="color: #008b8b;">1</span><span style="color: #7388d6;">}</span>; <span style="color: #707183;">}</span>
@@ -2517,8 +2565,8 @@ doesn't manage to elide the move.
 </aside>
 
 </section>
-<section id="slide-org23be467">
-<h3 id="org23be467">C++17: <code>insert_or_assign</code></h3>
+<section id="slide-org0b29b54">
+<h3 id="org0b29b54">C++17: <code>insert_or_assign</code></h3>
 <p>
 Of course, <code>insert</code> / <code>emplace</code> and <code>operator[]</code> actually do different things.
 </p>
@@ -2554,8 +2602,8 @@ but difficult/impossible to make as efficient as map can as a member function.
 </aside>
 
 </section>
-<section id="slide-org070e656">
-<h3 id="org070e656">C++17: <code>insert_or_assign</code></h3>
+<section id="slide-org0a6fc05">
+<h3 id="org0a6fc05">C++17: <code>insert_or_assign</code></h3>
 <p>
 Yet another slightly different interface&#x2026;
 </p>
@@ -2581,8 +2629,8 @@ could not avoid making a temporary to assign). But you can use the same
 </aside>
 
 </section>
-<section id="slide-org9d514fb">
-<h3 id="org9d514fb">Exhibit H</h3>
+<section id="slide-orga4001a4">
+<h3 id="orga4001a4">Exhibit H</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">typename</span> <span style="color: #228b22;">K</span>, <span style="color: #a020f0;">typename</span> <span style="color: #228b22;">V</span><span style="color: #707183;">&gt;</span>
@@ -2627,8 +2675,8 @@ also weakly-referenced from a deque (see Append call)?
 </aside>
 
 </section>
-<section id="slide-orged4546b">
-<h3 id="orged4546b">Exhibit H</h3>
+<section id="slide-org61100d5">
+<h3 id="org61100d5">Exhibit H</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #006400;">// </span><span style="color: #006400;">Insert the new value.</span>
@@ -2655,17 +2703,17 @@ We could use with<sub>result</sub><sub>of</sub> here to construct the shared<sub
 </aside>
 
 </section>
-<section id="slide-org2493d72">
-<h3 id="org2493d72">Recommendations</h3>
+<section id="slide-org7527e5b">
+<h3 id="org7527e5b">Recommendations</h3>
 <p>
 Yes, C++ is complicated.
 </p>
 
 <ul>
 <li>Initialization: consider <code>for_each_n_args</code></li>
-<li>Feel free to use <code>insert</code> with <code>make_pair</code>
+<li>You can use <code>insert</code> with <code>make_pair</code> and implicit construction
 <ul>
-<li>But don't use call-site construction</li>
+<li>But don't use call-site explicit construction</li>
 
 </ul></li>
 <li>Use <code>emplace</code> but beware of explicit construction with <code>blz</code></li>
@@ -2679,15 +2727,15 @@ Yes, C++ is complicated.
 </section>
 </section>
 <section>
-<section id="slide-org839c0c8">
-<h2 id="org839c0c8">6. Putting stuff into other things</h2>
+<section id="slide-org32a4aef">
+<h2 id="org32a4aef">6. Putting stuff into other things</h2>
 <p>
 Like <code>optional</code>, <code>variant</code>, <code>any</code>.
 </p>
 
 </section>
-<section id="slide-orgedf7779">
-<h3 id="orgedf7779"><code>optional</code> and friends</h3>
+<section id="slide-org924ce78">
+<h3 id="org924ce78"><code>optional</code> and friends</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #a020f0;">template</span> <span style="color: #707183;">&lt;</span><span style="color: #a020f0;">class</span><span style="color: #0000ff;">...</span> <span style="color: #228b22;">Args</span><span style="color: #707183;">&gt;</span>
@@ -2713,8 +2761,8 @@ constructing one thing.
 </aside>
 
 </section>
-<section id="slide-org2ddf7e8">
-<h3 id="org2ddf7e8"><code>optional</code> construction</h3>
+<section id="slide-org10e56bb">
+<h3 id="org10e56bb"><code>optional</code> construction</h3>
 <p>
 implicit constructor
 </p>
@@ -2760,8 +2808,8 @@ with an implicit constructor of course.
 </aside>
 
 </section>
-<section id="slide-orgc8dcb97">
-<h3 id="orgc8dcb97"><code>optional</code> assignment</h3>
+<section id="slide-orgd85b391">
+<h3 id="orgd85b391"><code>optional</code> assignment</h3>
 <p>
 implicit constructor
 </p>
@@ -2800,8 +2848,8 @@ Similar story here.
 </aside>
 
 </section>
-<section id="slide-orgdc6a81e">
-<h3 id="orgdc6a81e"><code>optional</code> recommendations</h3>
+<section id="slide-org8390f79">
+<h3 id="org8390f79"><code>optional</code> recommendations</h3>
 <ul>
 <li>use the <code>in_place_t</code> constructor</li>
 <li>use <code>=</code> for assignment, but avoid <code>explicit</code> construction</li>
@@ -2825,8 +2873,8 @@ You'll never go wrong with these.
 </aside>
 
 </section>
-<section id="slide-org4b82bf0">
-<h3 id="org4b82bf0"><code>variant</code> construction</h3>
+<section id="slide-org50cb6d8">
+<h3 id="org50cb6d8"><code>variant</code> construction</h3>
 <p>
 implicit constructor
 </p>
@@ -2868,8 +2916,8 @@ constructor explicit later on.
 </aside>
 
 </section>
-<section id="slide-org20ca05c">
-<h3 id="org20ca05c"><code>variant</code> construction</h3>
+<section id="slide-orgccf8e08">
+<h3 id="orgccf8e08"><code>variant</code> construction</h3>
 <p>
 Recommendation: use either of these two constructions.
 </p>
@@ -2895,8 +2943,8 @@ multiple places in the <code>variant</code>, which is relatively rarer.
 </aside>
 
 </section>
-<section id="slide-org9b97f4e">
-<h3 id="org9b97f4e"><code>variant</code> assignment</h3>
+<section id="slide-org4cba862">
+<h3 id="org4cba862"><code>variant</code> assignment</h3>
 <p>
 Similar story to construction.
 </p>
@@ -2912,8 +2960,8 @@ v = <span style="color: #008b8b;">1</span>;     <span style="color: #006400;">//
 </div>
 
 </section>
-<section id="slide-org5fd9aa5">
-<h3 id="org5fd9aa5"><code>variant</code> danger!</h3>
+<section id="slide-org166c9b4">
+<h3 id="org166c9b4"><code>variant</code> danger!</h3>
 <p>
 Implicitly-typed <code>variant</code> construction/assignment can be dangerous.
 </p>
@@ -2937,14 +2985,14 @@ Avoid implicit type conversions. They're dangerous. The first possible one will 
 </aside>
 
 </section>
-<section id="slide-orgcb5d3f6">
-<h3 id="orgcb5d3f6">Safe, efficient <code>variant</code> assignment</h3>
+<section id="slide-org31ad824">
+<h3 id="org31ad824">Safe, efficient <code>variant</code> assignment</h3>
 <div class="org-src-container">
 
 <pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span>;
 <span style="color: #006400;">// </span><span style="color: #006400;">template &lt;class T, class... Args&gt;</span>
 <span style="color: #006400;">// </span><span style="color: #006400;">T&amp; emplace(Args&amp;&amp;... args);</span>
-v.emplace<span style="color: #707183;">&lt;</span><span style="color: #008b8b;">1</span><span style="color: #707183;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;  <span style="color: #006400;">// </span><span style="color: #006400;">S{1}</span>
+v.emplace<span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;  <span style="color: #006400;">// </span><span style="color: #006400;">S{1}</span>
 </pre>
 </div>
 
@@ -2953,13 +3001,13 @@ v.emplace<span style="color: #707183;">&lt;</span><span style="color: #008b8b;">
 <pre  class="src src-c++"><span style="color: #228b22;">variant</span><span style="color: #707183;">&lt;</span><span style="color: #228b22;">int</span>, S<span style="color: #707183;">&gt;</span> <span style="color: #a0522d;">v</span>;
 <span style="color: #006400;">// </span><span style="color: #006400;">template &lt;size_t I, class... Args&gt;</span>
 <span style="color: #006400;">// </span><span style="color: #006400;">variant_alternative_t&lt;I, variant&gt;&amp; emplace(Args&amp;&amp;... args);</span>
-v.emplace<span style="color: #707183;">&lt;</span>S<span style="color: #707183;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;  <span style="color: #006400;">// </span><span style="color: #006400;">S{1}</span>
+v.emplace<span style="color: #707183;">&lt;</span><span style="color: #008b8b;">1</span><span style="color: #707183;">&gt;(</span><span style="color: #008b8b;">1</span><span style="color: #707183;">)</span>;  <span style="color: #006400;">// </span><span style="color: #006400;">S{1}</span>
 </pre>
 </div>
 
 </section>
-<section id="slide-org631092c">
-<h3 id="org631092c"><code>variant</code> recommendations</h3>
+<section id="slide-org9ae987c">
+<h3 id="org9ae987c"><code>variant</code> recommendations</h3>
 <ul>
 <li>always be explicit about types</li>
 <li>use <code>in_place_type</code> or <code>in_place_index</code> constructors</li>
@@ -2978,8 +3026,8 @@ Obviously <code>operator=</code> is used implicitly by the compiler.
 </section>
 </section>
 <section>
-<section id="slide-org6f31db5">
-<h2 id="org6f31db5">7. Final Guidelines and Recommendations</h2>
+<section id="slide-org7262ebe">
+<h2 id="org7262ebe">7. Final Guidelines and Recommendations</h2>
 <p>
 Think about copies and moves.
 </p>

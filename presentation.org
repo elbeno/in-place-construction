@@ -15,7 +15,7 @@
 #+TITLE: Everyday Efficiency: In-place Construction
 #+AUTHOR: Ben Deane
 #+EMAIL: bdeane@blizzard.com
-#+DATE: July 2018
+#+DATE: 13th July 2018
 
 #+REVEAL_HTML: <script type="text/javascript" src="./presentation.js"></script>
 
@@ -24,11 +24,10 @@
 (setq org-reveal-title-slide
 (concat "<h2>%t</h2>"
 "<div class='vertspace2'></div>"
-"<blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p>"
-"<div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote>"
+"<blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p>"
+"<div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote>"
 "<div class='vertspace3'></div>"
-"<h3>%a / <a href=\"mailto:bdeane@blizzard.com\">bdeane@blizzard.com</a> / "
-"<a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3>"
+"<h3>%a / <a href=\"mailto:bdeane@blizzard.com\">bdeane@blizzard.com</a></h3>"
 "<h4>%d</h4>"))
 (set-face-foreground 'font-lock-comment-face "dark green")
 #+END_SRC
@@ -113,10 +112,6 @@ void WebSocketHandshakerImpl::ProcessServerHandshake(HttpMessage message)
 This code assumes that it's safe to do whatever comes later to a moved-from ~vector~.
 
 ** Now consider:
-#+BEGIN_SRC c++
-string s1 = "Hello, world";
-string s2 = move(s1);
-#+END_SRC
 
 #+BEGIN_SRC c++
 string s1 = "Greetings, planet";
@@ -124,6 +119,13 @@ string s2 = move(s1);
 #+END_SRC
 
 What's the moved-from state of ~s1~?
+
+#+BEGIN_SRC c++
+string s3 = "Hello, world";
+string s4 = move(s3);
+#+END_SRC
+
+What's the moved-from state of ~s3~?
 
 #+BEGIN_NOTES
 What is the state of s1 in the second case? Same as the vector case basically.
@@ -460,6 +462,31 @@ string undecided_function()
 #+END_SRC
 Again, return value will still be moved.
 
+** Why is RVO important?
+
+#+BEGIN_SRC c++
+using M = map<string, int>;
+
+M build_map()
+{
+  M m;
+  m.insert(make_pair("Jenny", 8675309));
+  return m;
+}
+#+END_SRC
+
+#+BEGIN_NOTES
+RVO is really important for performance. It's probably the single most important
+optimization compilers make. Hence why it's been around for decades, even
+without a standard.
+
+If we accidentally inhibit RVO, we might also inhibit ~move~. We might get a
+copy.
+
+~move~ isn't necessarily cheap. Microsoft's node-based containers allocate in
+their move constructors because they use sentinel nodes.
+#+END_NOTES
+
 ** Quiz time
 
 Wake up!
@@ -695,6 +722,8 @@ pattern gets copied...
 
 #+BEGIN_NOTES
 First point does not affect RVO but is generally useless.
+
+Returning ~move(x)~ is only for ref-qualified accessors.
 
 URVO is easier for the compiler than NRVO. You are likely to get URVO in debug
 builds.
@@ -1002,9 +1031,9 @@ v.push_back(make_pair(1, Foo{42, "hello", 3.14}));
 
 // ...we can do this
 v.emplace_back(
-  make_pair(piecewise_construct,
-            forward_as_tuple(1),                   // args to int "constructor"
-            forward_as_tuple(42, "hello", 3.14))); // args to Foo constructor
+  piecewise_construct,
+  forward_as_tuple(1),                   // args to int "constructor"
+  forward_as_tuple(42, "hello", 3.14))); // args to Foo constructor
 #+END_SRC
 Perfect forwarding and in-place construction.
 
@@ -1019,9 +1048,9 @@ Perfect forwarding and in-place construction.
 
 * 4. ~initializer_list~
 
-How does it work?
-
-What are its limits?
+#+REVEAL_HTML: <div class='vertspace2'></div>
+#+REVEAL_HTML: <blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p>
+#+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote>
 
 ** What is ~initializer_list~?
 When you write:
@@ -1207,6 +1236,10 @@ It's a bit complicated.
 #+BEGIN_NOTES
 When I say ~map~, I mean ~map~, ~unordered_map~, ~multimap~, ~unordered_multimap~,
 etc, and also the various flavours of ~set~.
+
+Note: the ~value_type~ of a ~map~ is ~pair<const K, V>~. Confusingly, if we want
+to refer to just the value in the map and not the key, it's called the
+~mapped_type~.
 #+END_NOTES
 
 ** ~initializer_list~ with ~map~
@@ -1221,12 +1254,11 @@ M m { {0, Foo{}} }; // how many constructs/copies/moves?
 
 Use aggregate initialization with ~pair~.
 
-Suffers from the same problems as we saw earlier.
-
-And we can use the manual-array and move-iterator trick also.
+Is this good?
 
 #+BEGIN_NOTES
-Same as the ~vector~ init case basically.
+Same as the ~vector~ init case basically. ~initializer_list~ still suffers from
+the same problems.
 
 You can't use explicit constructors easily here.
 
@@ -1286,6 +1318,9 @@ Everything constructed in place.
 
 #+BEGIN_NOTES
 Here we are calling S's two-arg constructor.
+
+~for_each_n_args~ also works with vector (including vector-of-pair) as an
+alternative to ~initializer_list~
 #+END_NOTES
 
 ** Enough about initializing
@@ -1356,8 +1391,9 @@ are the decayed types of T1 and T2.
 The second line forces a pair of type <int, S&&>, so you get one move after the
 initial construct.
 
-The third line makes a pair<int, int> then uses that pair to construct a pair
-of <int, S> in the map.
+The third line makes a pair<int, int> then uses that pair to construct a pair of
+<int, S> in the map. This doesn't currently work with ~blz~. I'll get to why in
+a minute.
 #+END_NOTES
 
 ** ~emplace~
@@ -1699,8 +1735,8 @@ We could use with_result_of here to construct the shared_ptr directly in place.
 Yes, C++ is complicated.
 
  - Initialization: consider ~for_each_n_args~
- - Feel free to use ~insert~ with ~make_pair~
-   - But don't use call-site construction
+ - You can use ~insert~ with ~make_pair~ and implicit construction
+   - But don't use call-site explicit construction
  - Use ~emplace~ but beware of explicit construction with ~blz~
  - Use ~piecewise_construct~ for other than single-arg construction
  - Try to avoid ~operator[]~
@@ -1874,14 +1910,14 @@ Avoid implicit type conversions. They're dangerous. The first possible one will 
 variant<int, S> v;
 // template <class T, class... Args>
 // T& emplace(Args&&... args);
-v.emplace<1>(1);  // S{1}
+v.emplace<S>(1);  // S{1}
 #+END_SRC
 
 #+BEGIN_SRC c++
 variant<int, S> v;
 // template <size_t I, class... Args>
 // variant_alternative_t<I, variant>& emplace(Args&&... args);
-v.emplace<S>(1);  // S{1}
+v.emplace<1>(1);  // S{1}
 #+END_SRC
 
 ** ~variant~ recommendations
