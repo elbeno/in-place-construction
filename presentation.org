@@ -17,6 +17,8 @@
 #+EMAIL: bdeane@blizzard.com
 #+DATE: July 2018
 
+#+REVEAL_HTML: <script type="text/javascript" src="./presentation.js"></script>
+
 * Title slide settings                                             :noexport:
 #+BEGIN_SRC emacs-lisp
 (setq org-reveal-title-slide
@@ -45,6 +47,12 @@
 There will be a lot of code snippets in this talk.
 
 I will be asking a lot of questions.
+
+I'm assuming everyone is using C++14, although most things we talk about will
+require no more than C++11. I'll mention a couple of C++17 features.
+
+Most of what you see is common to either ~blz~ or toolchain-STL. I've omitted
+namespaces from the slides for brevity.
 #+END_NOTES
 
 * Disclaimer
@@ -1031,22 +1039,23 @@ Notice: the backing array is ~const~.
 #+END_NOTES
 
 ** ~initializer_list~ has ~const~ storage, 1
-The compiler is free to locate that array elsewhere in memory.
 #+BEGIN_SRC c++
-auto f() (int i, int j, int k)
+template <int... Is>
+auto f() ()
 {
-  return initializer_list<int>{ i,j,k };
+  return initializer_list<int>{ Is... };
+}
+
+void foo() {
+  for (int i: {1,2,3})
+    cout << i << '\n';
+}
+
+void bar() {
+  for (int i: f<1,2,3>())
+    cout << i << '\n';
 }
 #+END_SRC
-But it may not...
-#+BEGIN_SRC c++
-auto f() (int i, int j, int k)
-{
-  const int a[] = { i,j,k };
-  return initializer_list<int>(a, a+3);
-}
-#+END_SRC
-...and then you've returned a dangling reference.
 
 #+BEGIN_NOTES
 This is nasty, because it could work on one compiler and you wouldn't notice it.
@@ -1564,6 +1573,8 @@ inline auto with_result_of(F&& f)
 #+BEGIN_NOTES
 Capture the function and call it only at the point that we want to convert the
 result to an ~S~.
+
+~invoke_result_t~ is C++17 - before that you can use ~result_of_t~.
 #+END_NOTES
 
 ** ~emplace~ problem 2
@@ -1847,7 +1858,7 @@ v = 1;     // oops
 Implicitly-typed ~variant~ construction/assignment can be dangerous.
 
 #+BEGIN_SRC c++
-std::variant<bool, std::string> v = "Hello";
+variant<bool, string> v = "Hello";
 cout << "index is " << v.index() << '\n';
 #+END_SRC
 
@@ -1860,14 +1871,14 @@ Avoid implicit type conversions. They're dangerous. The first possible one will 
 ** Safe, efficient ~variant~ assignment
 
 #+BEGIN_SRC c++
-std::variant<int, S> v;
+variant<int, S> v;
 // template <class T, class... Args>
 // T& emplace(Args&&... args);
 v.emplace<1>(1);  // S{1}
 #+END_SRC
 
 #+BEGIN_SRC c++
-std::variant<int, S> v;
+variant<int, S> v;
 // template <size_t I, class... Args>
 // variant_alternative_t<I, variant>& emplace(Args&&... args);
 v.emplace<S>(1);  // S{1}
@@ -1877,7 +1888,7 @@ v.emplace<S>(1);  // S{1}
 
  - always be explicit about types
  - use ~in_place_type~ or ~in_place_index~ constructors
- - use ~emplace~
+ - use ~emplace<T>~ or ~emplace<I>~
  - avoid ~operator=~ (except actual ~variant~-to-~variant~)
 
 #+BEGIN_NOTES

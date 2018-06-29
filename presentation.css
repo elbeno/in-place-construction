@@ -147,3 +147,26 @@
 .reveal table {
     border: 2px solid white;
 }
+
+.reveal .star {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    text-align: center;
+}
+.reveal .star img {
+    border: 0px;
+    background: rgba(255,255,255,0);
+}
+.reveal .star .text_over_img {
+    font-family: Inconsolata;
+    font-size: 28px;
+    font-weight: 700;
+    color: rgb(231, 173, 82);
+    position: absolute;
+    margin: auto;
+    top: 35px;
+    bottom: 0;
+    left: 8px;
+    right: 0;
+}
