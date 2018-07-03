@@ -66,7 +66,7 @@ Let's make code better together!
 
 * Preliminaries
 
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="https://godbolt.org/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.5479341055999998,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Implicit+value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A%7D%3B%0A%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:61.43386897404203,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((h:compiler,i:(compiler:clang_trunk,filters:(b:'0',binary:'1',commentOnly:'0',demangle:'0',directives:'0',execute:'1',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'x86-64+clang+(trunk)+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),k:38.56613102595797,l:'4',n:'0',o:'',s:0,t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aint+main()%0A%7B%0A++++S+s%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:67.78783958602847,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'0'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17+-DBC_ASSERTIONS_ENABLED%3D0',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),k:50.268733850129195,l:'4',m:25.410872313527182,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:74.5891276864728,n:'0',o:'',s:0,t:'0')),k:32.21216041397154,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 You're going to see a lot of this later in the talk, when we examine how various
@@ -501,8 +501,10 @@ const S will_it_rvo()
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 Yes.
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aconst+S+will_it_rvo()%0A%7B%0A++return+S%7B1%7D%3B%0A%7D%0A%0Aint+main()%0A%7B%0A++++S+s+%3D+will_it_rvo()%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 Yes. You're allowed to cv-qualify return types and RVO still works.
@@ -521,8 +523,10 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 Yes.
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aconst+S+will_it_rvo(bool+b)%0A%7B%0A++if+(b)%0A++++return+S%7B1%7D%3B%0A++else%0A++++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 Yes. This is URVO, and works pretty reliably even in debug builds.
@@ -538,8 +542,10 @@ S will_it_rvo(bool b, S s)
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 No. (No opportunity.)
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aconst+S+will_it_rvo(bool+b,+S+s)%0A%7B%0A++if+(b)%0A++++s+%3D+S%7B1%7D%3B%0A++return+s%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1,+S%7B%7D)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 No - can't RVO a function parameter. It will move though.
@@ -557,8 +563,10 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 Yes. (Can RVO all the way down the callstack.)
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+get_S()+%7B+return+S%7B1%7D%3B+%7D%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++if+(b)%0A++++return+get_S()%3B%0A++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 Yes. This RVOs.
@@ -578,8 +586,10 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 Yes (Clang), no (MSVC/GCC).
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++if+(b)%0A++%7B%0A++++S+s%7B1%7D%3B%0A++++return+s%3B%0A++%7D%0A++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 There's nothing stopping it... but only Clang successfully RVO's this.
@@ -596,8 +606,10 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 No. Possibly in future?
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++S+s%7B1%7D%3B%0A++if+(b)%0A++++return+s%3B%0A++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 We hoisted the S out of the condition.
@@ -616,8 +628,10 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 No. (Against the rules.)
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++S+s%7B1%7D%3B%0A++return+b+%3F+s+:+S%7B0%7D%3B%0A%7D%0A%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 No RVO. We're not naming a variable.
@@ -639,8 +653,10 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 Yes. (Returning temporary.)
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+get_S()+%7B+return+S%7B1%7D%3B+%7D%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++return+b+%3F+get_S()+:+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 This RVOs. This time the conditional operator produces a prvalue because both of
@@ -657,8 +673,10 @@ S will_it_rvo()
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 Yes.
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo()%0A%7B%0A++S+s%7B1%7D%3B%0A++s+%3D+S%7B2%7D%3B%0A++return+s%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo()%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 Yep. Plain NRVO.
@@ -673,8 +691,10 @@ S will_it_rvo()
 }
 #+END_SRC
 
-#+ATTR_REVEAL: :frag (appear)
+** Will it RVO?
 Yes. Identifiers are allowed to be parenthesized in the ~return~ expression.
+
+#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo()%0A%7B%0A++S+s%7B1%7D%3B%0A++return+(s)%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo()%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 The standard explicitly allows this.
@@ -765,6 +785,8 @@ v.push_back(move(s));
 v.emplace_back(move(s));
 #+END_SRC
 
+[[http://b.n/vy][Compiler Explorer]]
+
 #+BEGIN_NOTES
 There is no difference.
 #+END_NOTES
@@ -799,6 +821,8 @@ const char* s = "Hello";
 v.push_back(s);
 v.emplace_back(s);
 #+END_SRC
+
+[[http://b.n/vz][Compiler Explorer]]
 
 #+BEGIN_NOTES
 ~push_back~ constructs a temporary then moves it.
@@ -863,6 +887,8 @@ copy(a.cbegin(), a.cend(), back_inserter(v));
 
 What does ~back_insert_iterator~ do here?
 
+[[http://b.n/va][Compiler Explorer]]
+
 #+BEGIN_NOTES
 For each element, we construct an ~S~ (from the ~Foo~) and then we move it into
 the ~vector~.
@@ -898,6 +924,8 @@ v.reserve(a.size());
 transform(a.cbegin(), a.cend(), back_inserter(v),
           [] (int i) { return S{i}; });
 #+END_SRC
+
+[[http://b.n/vA][Compiler Explorer]]
 
 #+BEGIN_NOTES
 For each element, we construct an ~S~ (from the ~int~) and then we move it into
@@ -948,7 +976,7 @@ v.reserve(a.size());
 copy(a.cbegin(), a.cend(), back_emplacer(v));
 #+END_SRC
 
-Now it works. And constructs in place.
+[[http://b.n/vB][Compiler Explorer]]
 
 ** Exhibit D
 #+BEGIN_SRC c++
@@ -1036,6 +1064,7 @@ v.emplace_back(
   forward_as_tuple(42, "hello", 3.14))); // args to Foo constructor
 #+END_SRC
 Perfect forwarding and in-place construction.
+[[http://b.n/vC][Compiler Explorer]]
 
 ** Recommendations
  - ~push_back~ is perfectly fine for rvalues
@@ -1295,7 +1324,6 @@ Everything here gets constructed in place. No moves or copies.
 This lambda deals with single-argument constructors for value. But...
 #+END_NOTES
 
-
 ** Alternative: multi-arg templatery
 
 #+BEGIN_SRC c++
@@ -1316,11 +1344,16 @@ for_each_n_args<3>(
 
 Everything constructed in place.
 
+[[http://b.n/vD][Compiler Explorer]]
+
 #+BEGIN_NOTES
 Here we are calling S's two-arg constructor.
 
 ~for_each_n_args~ also works with vector (including vector-of-pair) as an
 alternative to ~initializer_list~
+
+There are some issues with calling ~explicit~ constructors... it depends on the
+compiler/library. It is supposed to work.
 #+END_NOTES
 
 ** Enough about initializing
@@ -1379,6 +1412,8 @@ m.insert(make_pair(0, 1));
 #+END_SRC
 
 How many constructs/moves/copies?
+
+[[http://b.n/vE][Compiler Explorer]]
 
 #+BEGIN_NOTES
 
@@ -1629,6 +1664,8 @@ m.emplace(0, with_result_of([] { return get_S(); }));
 
 Compilers are really good at optimizing single-use lambdas.
 
+[[http://b.n/vF][Compiler Explorer]]
+
 #+BEGIN_NOTES
 You would think the second line here would work just as well. But VC++
 doesn't manage to elide the move.
@@ -1737,7 +1774,7 @@ Yes, C++ is complicated.
  - Initialization: consider ~for_each_n_args~
  - You can use ~insert~ with ~make_pair~ and implicit construction
    - But don't use call-site explicit construction
- - Use ~emplace~ but beware of explicit construction with ~blz~
+ - Use ~emplace~ but beware of explicit construction
  - Use ~piecewise_construct~ for other than single-arg construction
  - Try to avoid ~operator[]~
  - Adopt ~insert_or_assign~ when it's available
@@ -1899,6 +1936,8 @@ cout << "index is " << v.index() << '\n';
 #+END_SRC
 
 What does this output?
+
+[[https://godbolt.org/g/Ybkubf][Compiler Explorer]]
 
 #+BEGIN_NOTES
 Avoid implicit type conversions. They're dangerous. The first possible one will apply.
