@@ -15,9 +15,6 @@ function set_star(indexh, indexv) {
         6005: { display: 'block', innerHTML:'17' },
         6006: { display: 'block', innerHTML:'17' },
 
-        // invoke_result_t
-        8017: { display: 'block', innerHTML:'17' },
-
         // insert_or_assign
         8019: { display: 'block', innerHTML:'17' },
         8020: { display: 'block', innerHTML:'17' },

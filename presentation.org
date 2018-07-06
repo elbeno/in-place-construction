@@ -1626,7 +1626,7 @@ But, we can control when the result of the function call becomes an ~S~.
 template <typename F>
 struct with_result_of_t
 {
-  using T = invoke_result_t<F>;
+  using T = result_of_t<F()>;
   explicit with_result_of_t(F f) : f(move(f)) {}
   operator T() { return f(); }
 
