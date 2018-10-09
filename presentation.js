@@ -41,6 +41,109 @@ function set_star(indexh, indexv) {
     }
 }
 
+function encode_source(source) {
+    preamble = "http://localhost:10240/#g:!((g:!((g:!((h:codeEditor,i:(j:1,lang:c%2B%2B,source:'";
+    postamble = "'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:50,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B2a',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:63.657957244655584,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B',t:'0')),header:(),l:'4',m:36.342042755344416,n:'0',o:'',s:0,t:'0')),k:50,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4";
+
+    if (source.indexOf("will_it_rvo") != -1) {
+        source = '#include <stdio.h>\n\
+\n\
+struct Foo {};\n\
+\n\
+struct S\n\
+{\n\
+  S() { puts("Default construct\\n"); }\n\
+  S(Foo) { puts("Value construct\\n"); }\n\
+  explicit S(int) { puts("Explicit value construct (1)\\n"); }\n\
+  explicit S(int, int) { puts("Explicit value construct (2)\\n");}\n\
+  ~S() { puts("Destruct\\n"); }\n\
+  S(const S&) { puts("Copy construct\\n"); }\n\
+  S(S&&) { puts("Move construct\\n"); }\n\
+  S& operator=(const S&) { puts("Copy assign\\n"); return *this; }\n\
+  S& operator=(S&&) { puts("Move assign\\n"); return *this; }\n\
+};\n\
+\n\
+' + source;
+
+        if (source.indexOf("(bool b)") != -1) {
+            source += '\
+\n\
+int main()\n\
+{\n\
+  auto s = will_it_rvo(true);\n\
+}';
+        } else if (source.indexOf("(bool b, S s)") != -1) {
+            source += '\
+\n\
+int main()\n\
+{\n\
+  S s1;\n\
+  auto s2 = will_it_rvo(true, s1);\n\
+}';
+        } else {
+            source += '\
+\n\
+int main()\n\
+{\n\
+  auto s = will_it_rvo();\n\
+}';
+        }
+    } else if (source.indexOf('S>') != -1) {
+        source = '#include <stdio.h>\n\
+\n\
+struct Foo {};\n\
+\n\
+struct S\n\
+{\n\
+  S() { puts("Default construct\\n"); }\n\
+  S(Foo) { puts("Value construct\\n"); }\n\
+  explicit S(int) { puts("Explicit value construct (1)\\n"); }\n\
+  explicit S(int, int) { puts("Explicit value construct (2)\\n");}\n\
+  ~S() { puts("Destruct\\n"); }\n\
+  S(const S&) { puts("Copy construct\\n"); }\n\
+  S(S&&) { puts("Move construct\\n"); }\n\
+  S& operator=(const S&) { puts("Copy assign\\n"); return *this; }\n\
+  S& operator=(S&&) { puts("Move assign\\n"); return *this; }\n\
+};\n\
+\n\
+int main()\n\
+{\n\
+' + source + '\
+}';
+    }
+
+    if (source.indexOf("std::copy") != -1
+        || source.indexOf("std::transform") != -1) {
+        source = '#include <algorithm>\n' + source;
+    }
+    if (source.indexOf("std::array") != -1) {
+        source = '#include <array>\n' + source;
+    }
+    if (source.indexOf("std::cout") != -1) {
+        source = '#include <iostream>\n' + source;
+    }
+    if (source.indexOf("std::map") != -1) {
+        source = '#include <map>\n' + source;
+    }
+    if (source.indexOf("std::optional") != -1) {
+        source = '#include <optional>\n' + source;
+    }
+    if (source.indexOf("std::string") != -1) {
+        source = '#include <string>\n' + source;
+    }
+    if (source.indexOf("std::unordered_set") != -1) {
+        source = '#include <unordered_set>\n' + source;
+    }
+    if (source.indexOf("std::variant") != -1) {
+        source = '#include <variant>\n' + source;
+    }
+    if (source.indexOf("std::vector") != -1) {
+        source = '#include <vector>\n' + source;
+    }
+
+    return preamble + rison.quote(source.replace(/!/g, '!!').replace(/'/g, '!\'')) + postamble;
+}
+
 (function (window, undefined) {
     'use strict';
 
@@ -49,6 +152,27 @@ function set_star(indexh, indexv) {
             // event.previousSlide, event.currentSlide, event.indexh, event.indexv
             set_star(event.indexh, event.indexv);
         });
+
+        var pres = document.getElementsByTagName('pre');
+        for(var i = 0; i < pres.length; i++) {
+            var pre = pres[i];
+            if (pre.className === 'src src-c++') {
+                pre.onclick = (function() {
+                    var src = pre.textContent;
+                    return function() {
+                        window.location.href = encode_source(src);
+                    };
+                })();
+                pre.onauxclick = (function() {
+                    var src = pre.textContent;
+                    return function(e) {
+                        if (e.which == 2) {
+                            window.open(encode_source(src));
+                        }
+                    };
+                })();
+            }
+        }
     });
 
 })(window);

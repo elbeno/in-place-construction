@@ -14,9 +14,10 @@
 
 #+TITLE: Everyday Efficiency: In-place Construction
 #+AUTHOR: Ben Deane
-#+EMAIL: bdeane@blizzard.com
-#+DATE: 13th July 2018
+#+EMAIL: bdeane@quantlab.com
+#+DATE: November 2018
 
+#+REVEAL_HTML: <script type="text/javascript" src="./rison.js"></script>
 #+REVEAL_HTML: <script type="text/javascript" src="./presentation.js"></script>
 
 * Title slide settings                                             :noexport:
@@ -27,7 +28,7 @@
 "<blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p>"
 "<div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote>"
 "<div class='vertspace3'></div>"
-"<h3>%a / <a href=\"mailto:bdeane@blizzard.com\">bdeane@blizzard.com</a></h3>"
+"<h3>%a / <a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3>"
 "<h4>%d</h4>"))
 (set-face-foreground 'font-lock-comment-face "dark green")
 #+END_SRC
@@ -66,7 +67,29 @@ Let's make code better together!
 
 * Preliminaries
 
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aint+main()%0A%7B%0A++++S+s%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:67.78783958602847,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'0'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17+-DBC_ASSERTIONS_ENABLED%3D0',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),k:50.268733850129195,l:'4',m:25.410872313527182,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:74.5891276864728,n:'0',o:'',s:0,t:'0')),k:32.21216041397154,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
+#+BEGIN_SRC c++
+#include <stdio.h>
+
+struct Foo {};
+
+struct S
+{
+  S() { puts("Default construct\n"); }
+  S(Foo) { puts("Value construct\n"); }
+  explicit S(int) { puts("Explicit value construct (1)\n"); }
+  explicit S(int, int) { puts("Explicit value construct (2)\n");}
+  ~S() { puts("Destruct\n"); }
+  S(const S&) { puts("Copy construct\n"); }
+  S(S&&) { puts("Move construct\n"); }
+  S& operator=(const S&) { puts("Copy assign\n"); return *this; }
+  S& operator=(S&&) { puts("Move assign\n"); return *this; }
+};
+
+int main()
+{
+    S s;
+}
+#+END_SRC
 
 #+BEGIN_NOTES
 You're going to see a lot of this later in the talk, when we examine how various
@@ -75,8 +98,8 @@ snippets of code behave.
 
 * 1. What happens when we ~move~ something?
 #+BEGIN_SRC c++
-vector<int> v1 = {1, 2, 3, 4, 5};
-vector<int> v2 = move(v1);
+std::vector<int> v1 = {1, 2, 3, 4, 5};
+std::vector<int> v2 = std::move(v1);
 #+END_SRC
 
 What's in ~v1~ after the move?
@@ -104,8 +127,8 @@ void WebSocketHandshakerImpl::ProcessServerHandshake(HttpMessage message)
 {
   // some stuff...
 
-  m_result.extra = blz::move(m_readBuffer);
-  m_result.headers = blz::move(message.headers);
+  m_result.extra = std::move(m_readBuffer);
+  m_result.headers = std::move(message.headers);
 }
 #+END_SRC
 
@@ -114,15 +137,15 @@ This code assumes that it's safe to do whatever comes later to a moved-from ~vec
 ** Now consider:
 
 #+BEGIN_SRC c++
-string s1 = "Greetings, planet";
-string s2 = move(s1);
+std::string s1 = "Greetings, planet";
+std::string s2 = std::move(s1);
 #+END_SRC
 
 What's the moved-from state of ~s1~?
 
 #+BEGIN_SRC c++
-string s3 = "Hello, world";
-string s4 = move(s3);
+std::string s3 = "Hello, world";
+std::string s4 = std::move(s3);
 #+END_SRC
 
 What's the moved-from state of ~s3~?
@@ -150,7 +173,7 @@ first place.)
 
 Moves /only/ matter for objects on the heap.
 
-http://quick-bench.com/GtvOqmK-eltAretuiNzQQEcBxdY
+http://quick-bench.com/7zo0OLXgCyR3v_KwZKNIe5Z5Z64
 
 #+BEGIN_NOTES
 And as noted, it may be technically slower.
@@ -161,7 +184,7 @@ And as noted, it may be technically slower.
 void Context::Trigger(/* some args */)
 {
   // Make sure that it will trigger only once.
-  const OnResponseCallback cb = blz::move(m_responseCallback);
+  const OnResponseCallback cb = std::move(m_responseCallback);
 
   if (cb)
   {
@@ -188,9 +211,9 @@ Use ~exchange~ to make sure. Assigning an empty object is a trivial price for
 safety.
 
 #+BEGIN_SRC c++
-m_result.extra = blz::exchange(m_readBuffer, {});
+m_result.extra = std::exchange(m_readBuffer, {});
 
-const OnResponseCallback cb = blz::exchange(m_responseCallback, nullptr);
+const OnResponseCallback cb = std::exchange(m_responseCallback, nullptr);
 #+END_SRC
 
 Make your code safe for future small-buffer optimizations.
@@ -223,10 +246,10 @@ void WebSocketHandshakerImpl::ProcessServerHandshake(HttpMessage message)
   // some stuff...
 
   // which would be right here? this?
-  m_result.headers = blz::move(message.headers);
+  m_result.headers = std::move(message.headers);
 
   // or this?
-  m_result.headers = blz::move(message).headers;
+  m_result.headers = std::move(message).headers;
 }
 #+END_SRC
 
@@ -252,7 +275,7 @@ What if we decided to change this...
 #+BEGIN_SRC c++
 struct HttpMessage
 {
-  blz::string requestLine;
+  std::string requestLine;
   Headers headers;
 };
 #+END_SRC
@@ -260,7 +283,7 @@ struct HttpMessage
 #+BEGIN_SRC c++
 struct HttpMessage
 {
-  blz::string requestLine;
+  std::string requestLine;
   Headers& headers;
 };
 #+END_SRC
@@ -272,14 +295,14 @@ The HttpMessage itself can be an rvalue, but what it's referencing isn't.
 #+END_NOTES
 
 ** Guideline
-Use ~move(obj).member~ rather than ~move(obj.member)~
+Use ~std::move(obj).member~ rather than ~std::move(obj.member)~
 
 #+BEGIN_SRC c++
 // always safe, non-reference member is still an rvalue
-auto x = move(obj).member;
+auto x = std::move(obj).member;
 
 // could erroneously move from an lvalue-ref!
-auto x = move(obj.member);
+auto x = std::move(obj.member);
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -288,9 +311,9 @@ ref, no problem. We aren't losing anything and we're gaining safety.
 #+END_NOTES
 
 ** ~move~ safety guidelines
- - after ~move~, destroy or assign /only/
- - use ~exchange~ to move-and-clear
- - use ~move(obj).member~, not ~move(obj.member)~
+ - after ~std::move~, destroy or assign /only/
+ - use ~std::exchange~ to move-and-clear
+ - use ~std::move(obj).member~, not ~std::move(obj.member)~
 
 #+BEGIN_NOTES
 The last two points here are useful a lot of the time for writing move
@@ -393,7 +416,7 @@ variable in order to RVO it.
 You can't RVO a variable if you didn't get the chance to construct it in the
 first place.
 #+BEGIN_SRC c++
-string sad_function(string s)
+std::string sad_function(std::string s)
 {
   s += "No RVO for you!";
   return s;
@@ -410,18 +433,18 @@ as a last resort.
 
 An rvalue-ref is not the same type.
 #+BEGIN_SRC c++
-string sad_function()
+std::string sad_function()
 {
-  string s = "No RVO for you!";
-  return move(s);
+  std::string s = "No RVO for you!";
+  return std::move(s);
 }
 #+END_SRC
-Don't ~return move(x)~ in most cases - you will get a move when you didn't need anything!
+Don't ~return std::move(x)~ in most cases - you will get a move when you didn't need anything!
 
 #+BEGIN_NOTES
 There are legitimate cases for returning an rvalue reference.
 
-One of the few times when ~return move(x)~ is proper is when you're returning a
+One of the few times when ~return std::move(x)~ is proper is when you're returning a
 member variable out of a rvalue-ref-qualified member function.
 #+END_NOTES
 
@@ -432,9 +455,9 @@ Factory functions can't RVO.
 struct Base { ... };
 struct Derived : Base { ... };
 
-shared_ptr<Base> factory()
+std::shared_ptr<Base> factory()
 {
-  return make_shared<Derived>();
+  return std::make_shared<Derived>();
 }
 #+END_SRC
 But will still move.
@@ -448,10 +471,10 @@ e.g. returning a pair when the function returns a tuple, or something like that.
 
 It has to be decidable at construction time.
 #+BEGIN_SRC c++
-string undecided_function()
+std::string undecided_function()
 {
-  string happy = "Hooray";
-  string sad = "Boo hoo";
+  std::string happy = "Hooray";
+  std::string sad = "Boo hoo";
 
   if (getHappiness() > 0.5)
     return happy;
@@ -465,12 +488,12 @@ Again, return value will still be moved.
 ** Why is RVO important?
 
 #+BEGIN_SRC c++
-using M = map<string, int>;
+using M = std::map<std::string, int>;
 
 M build_map()
 {
   M m;
-  m.insert(make_pair("Jenny", 8675309));
+  m.insert(std::make_pair("Jenny", 8675309));
   return m;
 }
 #+END_SRC
@@ -501,10 +524,8 @@ const S will_it_rvo()
 }
 #+END_SRC
 
-** Will it RVO?
+#+ATTR_REVEAL: :frag (appear)
 Yes.
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aconst+S+will_it_rvo()%0A%7B%0A++return+S%7B1%7D%3B%0A%7D%0A%0Aint+main()%0A%7B%0A++++S+s+%3D+will_it_rvo()%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 Yes. You're allowed to cv-qualify return types and RVO still works.
@@ -523,10 +544,8 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-** Will it RVO?
-Yes.
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aconst+S+will_it_rvo(bool+b)%0A%7B%0A++if+(b)%0A++++return+S%7B1%7D%3B%0A++else%0A++++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
+#+ATTR_REVEAL: :frag (appear)
+Yes. Even in debug builds.
 
 #+BEGIN_NOTES
 Yes. This is URVO, and works pretty reliably even in debug builds.
@@ -542,10 +561,8 @@ S will_it_rvo(bool b, S s)
 }
 #+END_SRC
 
-** Will it RVO?
-No. (No opportunity.)
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0Aconst+S+will_it_rvo(bool+b,+S+s)%0A%7B%0A++if+(b)%0A++++s+%3D+S%7B1%7D%3B%0A++return+s%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1,+S%7B%7D)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
+#+ATTR_REVEAL: :frag (appear)
+No (no opportunity).
 
 #+BEGIN_NOTES
 No - can't RVO a function parameter. It will move though.
@@ -563,14 +580,12 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-** Will it RVO?
-Yes. (Can RVO all the way down the callstack.)
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+get_S()+%7B+return+S%7B1%7D%3B+%7D%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++if+(b)%0A++++return+get_S()%3B%0A++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1',undefined:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
+#+ATTR_REVEAL: :frag (appear)
+Yes (can elide multiple copies).
 
 #+BEGIN_NOTES
 Yes. This RVOs.
-RVO is allowed to elide multiple copies.
+RVO is allowed to elide multiple copies down the callstack.
 #+END_NOTES
 
 ** Will it RVO?
@@ -586,10 +601,8 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-** Will it RVO?
+#+ATTR_REVEAL: :frag (appear)
 Yes (Clang), no (MSVC/GCC).
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++if+(b)%0A++%7B%0A++++S+s%7B1%7D%3B%0A++++return+s%3B%0A++%7D%0A++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 There's nothing stopping it... but only Clang successfully RVO's this.
@@ -606,10 +619,8 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-** Will it RVO?
+#+ATTR_REVEAL: :frag (appear)
 No. Possibly in future?
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++S+s%7B1%7D%3B%0A++if+(b)%0A++++return+s%3B%0A++return+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 We hoisted the S out of the condition.
@@ -628,10 +639,8 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-** Will it RVO?
+#+ATTR_REVEAL: :frag (appear)
 No. (Against the rules.)
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++S+s%7B1%7D%3B%0A++return+b+%3F+s+:+S%7B0%7D%3B%0A%7D%0A%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 No RVO. We're not naming a variable.
@@ -653,10 +662,8 @@ S will_it_rvo(bool b)
 }
 #+END_SRC
 
-** Will it RVO?
+#+ATTR_REVEAL: :frag (appear)
 Yes. (Returning temporary.)
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+get_S()+%7B+return+S%7B1%7D%3B+%7D%0A%0AS+will_it_rvo(bool+b)%0A%7B%0A++return+b+%3F+get_S()+:+S%7B0%7D%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo(argc+%3D%3D+1)%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 This RVOs. This time the conditional operator produces a prvalue because both of
@@ -673,10 +680,8 @@ S will_it_rvo()
 }
 #+END_SRC
 
-** Will it RVO?
+#+ATTR_REVEAL: :frag (appear)
 Yes.
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo()%0A%7B%0A++S+s%7B1%7D%3B%0A++s+%3D+S%7B2%7D%3B%0A++return+s%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo()%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
 
 #+BEGIN_NOTES
 Yep. Plain NRVO.
@@ -691,13 +696,13 @@ S will_it_rvo()
 }
 #+END_SRC
 
-** Will it RVO?
-Yes. Identifiers are allowed to be parenthesized in the ~return~ expression.
-
-#+REVEAL_HTML: <iframe width="1400px" height="600px" src="http://localhost:10240/e#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'%23include+%3Cstdio.h%3E%0A%0Astruct+Foo+%7B%7D%3B%0A%0Astruct+S%0A%7B%0A++S()+%7B+puts(%22Default+construct%5Cn%22)%3B+%7D%0A++S(Foo)+%7B+puts(%22Value+construct%5Cn%22)%3B+%7D%0A++explicit+S(int)+%7B+puts(%22Explicit+value+construct+(1)%5Cn%22)%3B+%7D%0A++explicit+S(int,+int)+%7B+puts(%22Explicit+value+construct+(2)%5Cn%22)%3B%7D%0A++~S()+%7B+puts(%22Destruct%5Cn%22)%3B+%7D%0A++S(const+S%26)+%7B+puts(%22Copy+construct%5Cn%22)%3B+%7D%0A++S(S%26%26)+%7B+puts(%22Move+construct%5Cn%22)%3B+%7D%0A++S%26+operator%3D(const+S%26)+%7B+puts(%22Copy+assign%5Cn%22)%3B+return+*this%3B+%7D%0A++S%26+operator%3D(S%26%26)+%7B+puts(%22Move+assign%5Cn%22)%3B+return+*this%3B+%7D%0A%7D%3B%0A%0AS+will_it_rvo()%0A%7B%0A++S+s%7B1%7D%3B%0A++return+(s)%3B%0A%7D%0A%0Aint+main(int+argc,+char*+argv%5B%5D)%0A%7B%0A++++S+s+%3D+will_it_rvo()%3B%0A%7D%0A'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:63.0659767141009,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B-6.0,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!((name:bc,ver:master),(name:blz,ver:master)),options:'-O3+-std%3Dc%2B%2B17',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B-6.0+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:19.721871049304678,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B-6.0',t:'0')),header:(),l:'4',m:80.27812895069533,n:'0',o:'',s:0,t:'0')),k:36.9340232858991,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"></iframe>
+#+ATTR_REVEAL: :frag (appear)
+Yes.
+#+ATTR_REVEAL: :frag (appear)
+[[http://eel.is/c++draft/class.copy.elision#3.1][class.copy.elision \S 3.1]]
 
 #+BEGIN_NOTES
-The standard explicitly allows this.
+The standard explicitly allows this -- (possibly parenthesized) /id-expression/.
 
 However... there seems to be a bug in GCC where it doesn't RVO this. MSVC does
 and Clang does.
@@ -711,12 +716,12 @@ RVO. It does in C++11 mode, just not in C++14 or C++17 mode.
 #+BEGIN_SRC c++
 unsigned long long Time() const override
 {
-  auto ts = blz::get<1>(blz::move(Base::metrics_->GetDataPointAndTime()));
+  auto ts = std::get<1>(std::move(Base::metrics_->GetDataPointAndTime()));
   return ts;
 }
 #+END_SRC
 
-Superfluous (potentially dangerous?) call to ~move~.
+Superfluous (potentially dangerous?) call to ~std::move~.
 
 NRVO is not guaranteed in debug mode. Better:
 
@@ -735,7 +740,7 @@ pattern gets copied...
 ** Guidelines for RVO-friendliness
 
  - don't const-qualify returned value types
- - almost never return ~move(x)~
+ - almost never return ~std::move(x)~
  - return temporaries where you can
  - when you return named things, avoid conditions
  - don't parenthesize return expressions
@@ -743,7 +748,7 @@ pattern gets copied...
 #+BEGIN_NOTES
 First point does not affect RVO but is generally useless.
 
-Returning ~move(x)~ is only for ref-qualified accessors.
+Returning ~std::move(x)~ is only for ref-qualified accessors.
 
 URVO is easier for the compiler than NRVO. You are likely to get URVO in debug
 builds.
@@ -777,15 +782,13 @@ Until C++17, ~emplace_back~ returns ~void~.
 What's the difference here?
 
 #+BEGIN_SRC c++
-vector<string> v;
-string s;
+std::vector<std::string> v;
+std::string s;
 // ...
 
-v.push_back(move(s));
-v.emplace_back(move(s));
+v.push_back(std::move(s));
+v.emplace_back(std::move(s));
 #+END_SRC
-
-[[http://b.n/vy][Compiler Explorer]]
 
 #+BEGIN_NOTES
 There is no difference.
@@ -796,12 +799,11 @@ There is no difference.
 What's the difference here?
 
 #+BEGIN_SRC c++
-vector<string> v;
-string s;
-// ...
+std::vector<std::string> v;
+std::string s;
 
-v.push_back(move(s));
-string& last_s = v.emplace_back(move(s));
+v.push_back(std::move(s));
+std::string& last_s = v.emplace_back(std::move(s));
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -814,15 +816,12 @@ If we want to capture a reference to the thing that was pushed, we can use
 What's the difference here?
 
 #+BEGIN_SRC c++
-vector<string> v;
+std::vector<std::string> v;
 const char* s = "Hello";
-// ...
 
 v.push_back(s);
 v.emplace_back(s);
 #+END_SRC
-
-[[http://b.n/vz][Compiler Explorer]]
 
 #+BEGIN_NOTES
 ~push_back~ constructs a temporary then moves it.
@@ -837,7 +836,7 @@ Remember, for string, a move is usually as expensive as a copy.
 Default in-place construct.
 
 #+BEGIN_SRC c++
-vector<S> v;
+std::vector<S> v;
 
 // first default-construct in the vector
 S& s = v.emplace_back();
@@ -858,7 +857,7 @@ In-place construct with ~explicit~ constructor.
 
 #+BEGIN_SRC c++
 // recall: S has an explicit constructor from int
-vector<S> v;
+std::vector<S> v;
 
 // push_back can't do explicit construction
 v.push_back(1);  // compiler error!
@@ -878,16 +877,14 @@ Recall: our ~S~ class has a constructor from ~Foo~, and an ~explicit~ constructo
 from ~int~.
 
 #+BEGIN_SRC c++
-vector<S> v;
-array<Foo, N> a = { ... };
+std::vector<S> v;
+std::array<Foo, 3> a = { Foo{}, Foo{}, Foo{} };
 v.reserve(a.size());
 
-copy(a.cbegin(), a.cend(), back_inserter(v));
+std::copy(a.cbegin(), a.cend(), std::back_inserter(v));
 #+END_SRC
 
 What does ~back_insert_iterator~ do here?
-
-[[http://b.n/va][Compiler Explorer]]
 
 #+BEGIN_NOTES
 For each element, we construct an ~S~ (from the ~Foo~) and then we move it into
@@ -898,11 +895,11 @@ the ~vector~.
 What if we have an ~array~ of ~int~?
 
 #+BEGIN_SRC c++
-vector<S> v;
-array<int, N> a = { ... };
+std::vector<S> v;
+std::array a = { 1,2,3,4,5 };
 v.reserve(a.size());
 
-copy(a.cbegin(), a.cend(), back_inserter(v));
+std::copy(a.cbegin(), a.cend(), std::back_inserter(v));
 #+END_SRC
 
 #+ATTR_REVEAL: :frag (appear)
@@ -917,15 +914,13 @@ constructor.
 OK, no problem, right?
 
 #+BEGIN_SRC c++
-vector<S> v;
-array<int, N> a = { ... };
+std::vector<S> v;
+std::array a = { 1,2,3,4,5 };
 v.reserve(a.size());
 
-transform(a.cbegin(), a.cend(), back_inserter(v),
-          [] (int i) { return S{i}; });
+std::transform(a.cbegin(), a.cend(), std::back_inserter(v),
+               [] (int i) { return S{i}; });
 #+END_SRC
-
-[[http://b.n/vA][Compiler Explorer]]
 
 #+BEGIN_NOTES
 For each element, we construct an ~S~ (from the ~int~) and then we move it into
@@ -947,7 +942,7 @@ struct back_emplace_iterator
 
   template <typename Arg>
   back_emplace_iterator& operator=(Arg&& arg) {
-    c->emplace_back(forward<Arg>(arg));
+    c->emplace_back(std::forward<Arg>(arg));
     return *this;
   }
 
@@ -958,6 +953,8 @@ private:
 
 ** ~back_emplacer~
 #+BEGIN_SRC c++
+// pre-CTAD maker function
+
 template <typename Container>
 auto back_emplacer(Container& c)
 {
@@ -969,21 +966,19 @@ auto back_emplacer(Container& c)
 What if we have an ~array~ of ~int~?
 
 #+BEGIN_SRC c++
-vector<S> v;
-array<int, N> a = { ... };
+std::vector<S> v;
+std::array a = { 1,2,3,4,5 };
 v.reserve(a.size());
 
-copy(a.cbegin(), a.cend(), back_emplacer(v));
+std::copy(a.cbegin(), a.cend(), back_emplacer(v));
 #+END_SRC
-
-[[http://b.n/vB][Compiler Explorer]]
 
 ** Exhibit D
 #+BEGIN_SRC c++
-blz::vector<blz::string_view> tokens;
+std::vector<std::string_view> tokens;
 // ...
-blz::string_view token = /* stuff */;
-tokens.emplace_back(blz::move(token));
+std::string_view token = /* stuff */;
+tokens.emplace_back(std::move(token));
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -997,7 +992,7 @@ A few things here:
 ** Exhibit E
 
 #+BEGIN_SRC c++
-context->m_result->m_headers.emplace_back(string(headerData, numBytes));
+context->m_result->m_headers.emplace_back(std::string(headerData, numBytes));
 #+END_SRC
 
 A superfluous move! Better:
@@ -1018,15 +1013,15 @@ Sometimes, we use a  sorted ~vector~ of ~pair~ as a replacement for ~map~.
 What do you do if part of your ~pair~ has a multi-argument constructor?
 
 #+BEGIN_SRC c++
-struct Foo { Foo(int, string, double); };
+struct Foo { Foo(int, std::string, double); };
 
-vector<pair<int, Foo>> v;
+std::vector<std::pair<int, Foo>> v;
 
 // this is very common!
-v.push_back(make_pair(1, Foo{42, "hello", 3.14}));
+v.push_back(std::make_pair(1, Foo{42, "hello", 3.14}));
 
 // this is no better
-v.emplace_back(make_pair(1, Foo{42, "hello", 3.14}));
+v.emplace_back(std::make_pair(1, Foo{42, "hello", 3.14}));
 
 // how can we do better?
 v.emplace_back( /* what here? */ );
@@ -1050,21 +1045,20 @@ constexpr tuple<Types&&...> forward_as_tuple(Types&&... args) noexcept;
 
 ** Using ~piecewise_construct~
 #+BEGIN_SRC c++
-struct Foo { Foo(int, string, double); };
+struct Foo { Foo(int, std::string, double); };
 
-vector<pair<int, Foo>> v;
+std::vector<std::pair<int, Foo>> v;
 
 // instead of this...
-v.push_back(make_pair(1, Foo{42, "hello", 3.14}));
+v.push_back(std::make_pair(1, Foo{42, "hello", 3.14}));
 
 // ...we can do this
 v.emplace_back(
-  piecewise_construct,
-  forward_as_tuple(1),                   // args to int "constructor"
-  forward_as_tuple(42, "hello", 3.14))); // args to Foo constructor
+  std::piecewise_construct,
+  std::forward_as_tuple(1),                   // args to int "constructor"
+  std::forward_as_tuple(42, "hello", 3.14))); // args to Foo constructor
 #+END_SRC
 Perfect forwarding and in-place construction.
-[[http://b.n/vC][Compiler Explorer]]
 
 ** Recommendations
  - ~push_back~ is perfectly fine for rvalues
@@ -1084,12 +1078,12 @@ Perfect forwarding and in-place construction.
 ** What is ~initializer_list~?
 When you write:
 #+BEGIN_SRC c++
-vector<int> v{ 1,2,3 };
+std::vector<int> v{ 1,2,3 };
 #+END_SRC
 It's as if you wrote:
 #+BEGIN_SRC c++
 const int a[] = { 1,2,3 };
-vector<int> v = initializer_list<int>(a, a+3);
+std::vector<int> v = std::initializer_list<int>(a, a+3);
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -1101,7 +1095,7 @@ Notice: the backing array is ~const~.
 template <int... Is>
 auto f() ()
 {
-  return initializer_list<int>{ Is... };
+  return std::initializer_list<int>{ Is... };
 }
 
 void foo() {
@@ -1130,10 +1124,10 @@ unique_ptr<int> v = { make_unique<int>(1), make_unique<int>(2) };
 #+END_SRC
 That also means ~move~ can't work.
 #+BEGIN_SRC c++
-const unique_ptr<int> a[] = { make_unique<int>(1),
-                              make_unique<int>(2) };
-vector<unique_ptr<int>> v =
-  initializer_list<unique_ptr<int>>(a, a+3);
+const std::unique_ptr<int> a[] = { std::make_unique<int>(1),
+                                   std::make_unique<int>(2) };
+std::vector<std::unique_ptr<int>> v =
+  std::initializer_list<std::unique_ptr<int>>(a, a+3);
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -1144,13 +1138,13 @@ You can't move from an ~initializer_list~ - this won't compile.
 I'd much rather write:
 
 #+BEGIN_SRC c++
-vector<S> v = { S{1}, S{2}, S{3} };
+std::vector<S> v = { S{1}, S{2}, S{3} };
 #+END_SRC
 (3 constructs, 3 copies, 3 destructs)
 
 Than:
 #+BEGIN_SRC c++
-vector<S> v;
+std::vector<S> v;
 v.reserve(3);
 v.emplace_back(1);
 v.emplace_back(2);
@@ -1168,14 +1162,14 @@ construction.
 ** We can make it a little better...
 
 #+BEGIN_SRC c++
-vector<S> v = { S{1}, S{2}, S{3} };
+std::vector<S> v = { S{1}, S{2}, S{3} };
 #+END_SRC
 (3 constructs, 3 copies, 3 destructs)
 
 #+BEGIN_SRC c++
 S a[3] = { S{1}, S{2}, S{3} };
-vector<S> v(make_move_iterator(begin(a)),
-            make_move_iterator(end(a)));
+std::vector<S> v(std::make_move_iterator(std::begin(a)),
+                 std::make_move_iterator(std::end(a)));
 #+END_SRC
 (3 constructs, 3 moves, 3 destructs)
 
@@ -1194,7 +1188,7 @@ https://wg21.tartanllama.xyz/initializer_list
 
 ** Exhibit F
 #+BEGIN_SRC c++
-unordered_set<string> kKeywords = {
+std::unordered_set<std::string> kKeywords = {
 	"alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
 	"bool", "break", "case", "catch", "char", "class", "compl", "const",
 	"constexpr", "const_cast", "continue", "decltype", "default", "delete", "do",
@@ -1211,11 +1205,11 @@ unordered_set<string> kKeywords = {
 
 ** Caveat Constructor
 
-~string~ is an interesting case here. We intuit/are taught:
+~std::string~ is an interesting case here. We intuit/are taught:
 
 #+REVEAL_HTML: <blockquote nil><p>Delay construction, allocation, etc. as late as possible.</p></blockquote>
 
-But that might hurt us with ~string~.
+But that might hurt us with ~std::string~.
 
 [[https://www.youtube.com/watch?v=sSlmmZMFsXQ]["Initializer Lists are Broken, Let's Fix Them"]] -- Jason Turner, C++Now 2018
 
@@ -1277,7 +1271,7 @@ It's perfectly possible to initialize a map with an ~initializer_list~.
 #+BEGIN_SRC c++
 // recall S has an implicit constructor from Foo
 
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m { {0, Foo{}} }; // how many constructs/copies/moves?
 #+END_SRC
 
@@ -1297,12 +1291,15 @@ If you have explicit constructors you might need to explicitly call out the type
 
 ** Alternative: templatery
 
+https://gist.github.com/elbeno/609e929ef6898f09e96a#file-for_each_args-cpp-L55
 #+BEGIN_SRC c++
 // call an N-ary function on each lot of N args passed in
 template <size_t N, typename F, typename... Ts>
 void for_each_n_args(F&& f, Ts&&... ts);
+#+END_SRC
 
-using M = map<int, S>;
+#+BEGIN_SRC c++
+using M = std::map<int, S>;
 M m;
 for_each_n_args<2>(
   [&] (auto&& k, auto&& v) {
@@ -1317,8 +1314,6 @@ If you know the types, you can probably write the lambda in a less ugly way.
 ~for_each_n_args~ is a function template that perfectly-forwards its arguments
 in groups of N to the function you give it.
 
-It's in the Phoenix code base and it's useful for things like this.
-
 Everything here gets constructed in place. No moves or copies.
 
 This lambda deals with single-argument constructors for value. But...
@@ -1327,24 +1322,18 @@ This lambda deals with single-argument constructors for value. But...
 ** Alternative: multi-arg templatery
 
 #+BEGIN_SRC c++
-// call an N-ary function on each lot of N args passed in
-template <size_t N, typename F, typename... Ts>
-void for_each_n_args(F&& f, Ts&&... ts);
-
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 for_each_n_args<3>(
   [&] (auto&& k, auto&&... v) {
       m.emplace(
-        piecewise_construct,
-        forward_as_tuple(forward<decltype(k)>(k)),
-        forward_as_tuple(forward<decltype(v)>(v)...); },
+        std::piecewise_construct,
+        std::forward_as_tuple(std::forward<decltype(k)>(k)),
+        std::forward_as_tuple(std::forward<decltype(v)>(v)...); },
   0, 1, 2); // explicit multi-arg value constructor
 #+END_SRC
 
 Everything constructed in place.
-
-[[http://b.n/vD][Compiler Explorer]]
 
 #+BEGIN_NOTES
 Here we are calling S's two-arg constructor.
@@ -1366,7 +1355,7 @@ How about putting things into an existing ~map~?
 // recall S has an implicit constructor from Foo
 // but an explicit constructor from int
 
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 m[0] = S{1};
 m[1] = Foo{};
@@ -1397,7 +1386,7 @@ a map, if you never use this function. And that can be a significant thing.
 // recall S has an implicit constructor from Foo
 // but an explicit constructor from int
 
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 
 // pair<iterator,bool> insert(value_type&& value);
@@ -1406,14 +1395,12 @@ M m;
 // pair<V1,V2> make_pair(T1&& t, T2&& u);
 
 // alternatives:
-m.insert(make_pair(0, S{1}));
-m.insert(pair<int, S&&>(0, S{1}));
-m.insert(make_pair(0, 1));
+m.insert(std::make_pair(0, S{1}));
+m.insert(std::pair<int, S&&>(0, S{1}));
+m.insert(std::make_pair(0, 1));
 #+END_SRC
 
 How many constructs/moves/copies?
-
-[[http://b.n/vE][Compiler Explorer]]
 
 #+BEGIN_NOTES
 
@@ -1439,7 +1426,7 @@ Enter the /wonderful C++11 panacea/ that is move semantics.
 // recall S has an implicit constructor from Foo
 // but an explicit constructor from int
 
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 
 // template <class... Args>
@@ -1449,7 +1436,7 @@ M m;
 // m.insert(make_pair(0, S{1}));
 
 // much better, right?
-m.emplace(make_pair(0, S{1}));
+m.emplace(std::make_pair(0, S{1}));
 #+END_SRC
 
 You guessed it...
@@ -1464,7 +1451,7 @@ Don't do this. It is /exactly/ the same as ~insert~ here. Two moves.
 // recall S has an implicit constructor from Foo
 // but an explicit constructor from int
 
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 
 // template <class... Args>
@@ -1480,25 +1467,12 @@ It doesn't help you over ~insert~ if you just pass rvalues. ~insert~ works just
 fine with rvalues.
 #+END_NOTES
 
-** ~emplace~: ~blz~ caveat
-
-At the moment, ~blz::map::emplace~ cannot invoke ~explicit~ constructors.
-
-(~blz::vector::emplace_back~ can)
-
-#+BEGIN_NOTES
-This is a gnarly area of the STL: conditionally explicit constructors on ~pair~.
-
-There's an issue open on ~blz~ about it: if it's important to you, help with the
-fix. It's been difficult to achieve cross-platform compiler support properly.
-#+END_NOTES
-
 ** ~emplace~ problem
 
 What do we do when we want to default-construct the value?
 
 #+BEGIN_SRC c++
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 m.emplace(0); // default construct S please!
 #+END_SRC
@@ -1513,6 +1487,9 @@ we can't syntactically pass "zero arguments" in the place of an argument.
 
 We don't want to default-construct an S explicitly here and move it in.
 
+We could use ~operator[]~ but that would be weird. I don't like expression
+statements and I would probably write ~operator[]~ with nodiscard.
+
 Remember the ~value_type~ of the ~map~ is a ~pair~ - that's what ~emplace~ is
 trying to construct.
 #+END_NOTES
@@ -1522,11 +1499,11 @@ trying to construct.
 Our old friend ~piecewise_construct~ can help.
 
 #+BEGIN_SRC c++
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
-m.emplace(piecewise_construct,
-          forward_as_tuple(0),
-          forward_as_tuple()); // default construct S please!
+m.emplace(std::piecewise_construct,
+          std::forward_as_tuple(0),
+          std::forward_as_tuple()); // default construct S please!
 #+END_SRC
 
 Tuples are allowed to be empty!
@@ -1544,11 +1521,11 @@ This also gets around the ~blz~ limitation on ~explicit~ constructors with
 
 #+BEGIN_SRC c++
 // explicit ClientIdRecord(
-//  const string& clientId, const ProcessId& clientProcess, const ProcessId& romeoProcess);
+//  const string& clientId, const ProcessId& clientProc, const ProcessId& serverProc);
 
-using Storage = unordered_set<ClientIdRecord>;
+using Storage = std::unordered_set<ClientIdRecord>;
 Storage m_storage;
-m_storage.emplace(inClientId, process, romeoProcess);
+m_storage.emplace(inClientId, clientProc, serverProc);
 #+END_SRC
 
 Perfectly fine as far as ~emplace~ usage.
@@ -1558,7 +1535,7 @@ Then we want to change the ~unordered_set~ to an ~unordered_map~.
 #+BEGIN_NOTES
 ClientIdRecord has a 3-argument constructor.
 
-~inClientId~ is a string
+~inClientId~ is a string.
 
 One in-place construct. This is fine.
 #+END_NOTES
@@ -1567,13 +1544,13 @@ One in-place construct. This is fine.
 
 #+BEGIN_SRC c++
 // explicit ClientIdRecord(
-//  const string& clientId, const ProcessId& clientProcess, const ProcessId& romeoProcess);
+//  const string& clientId, const ProcessId& clientProc, const ProcessId& serverProc);
 
-using Storage = unordered_map<string, ClientIdRecord>;
+using Storage = std::unordered_map<std::string, ClientIdRecord>;
 Storage m_storage;
 m_storage.emplace(
-  make_pair(inClientId,
-            ClientIdRecord(inClientId, process, romeoProcess)));
+  std::make_pair(inClientId,
+                 ClientIdRecord(inClientId, clientProc, serverProc)));
 #+END_SRC
 
 Is this optimal?
@@ -1587,11 +1564,11 @@ How do we do better?
 ** Exhibit G
 
 #+BEGIN_SRC c++
-using Storage = unordered_map<string, ClientIdRecord>;
+using Storage = std::unordered_map<std::string, ClientIdRecord>;
 Storage m_storage;
-m_storage.emplace(piecewise_construct,
-                  forward_as_tuple(inClientId),
-                  forward_as_tuple(inClientId, process, romeoProcess));
+m_storage.emplace(std::piecewise_construct,
+                  std::forward_as_tuple(inClientId),
+                  std::forward_as_tuple(inClientId, clientProc, serverProc));
 #+END_SRC
 
 Use ~piecewise_construct~ again.
@@ -1605,7 +1582,7 @@ S get_S() { return S{1}; }
 #+END_SRC
 
 #+BEGIN_SRC c++
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 m.emplace(0, get_S());
 #+END_SRC
@@ -1626,18 +1603,18 @@ But, we can control when the result of the function call becomes an ~S~.
 template <typename F>
 struct with_result_of_t
 {
-  using T = result_of_t<F()>;
-  explicit with_result_of_t(F f) : f(move(f)) {}
+  using T = std::result_of_t<F()>;
+  explicit with_result_of_t(F f) : f(std::move(f)) {}
   operator T() { return f(); }
 
 private:
   F f;
 };
 
+// prior to CTAD
 template <typename F>
-inline auto with_result_of(F&& f)
-{
-  return with_result_of_t<F>(forward<F>(f));
+inline auto with_result_of(F&& f) {
+  return with_result_of_t<F>(std::forward<F>(f));
 }
 #+END_SRC
 
@@ -1652,10 +1629,8 @@ result to an ~S~.
 
 #+BEGIN_SRC c++
 S get_S() { return S{1}; }
-#+END_SRC
 
-#+BEGIN_SRC c++
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 m.emplace(0, with_result_of([] { return get_S(); }));
 
@@ -1663,8 +1638,6 @@ m.emplace(0, with_result_of([] { return get_S(); }));
 #+END_SRC
 
 Compilers are really good at optimizing single-use lambdas.
-
-[[http://b.n/vF][Compiler Explorer]]
 
 #+BEGIN_NOTES
 You would think the second line here would work just as well. But VC++
@@ -1699,7 +1672,7 @@ but difficult/impossible to make as efficient as map can as a member function.
 Yet another slightly different interface...
 
 #+BEGIN_SRC c++
-using M = map<int, S>;
+using M = std::map<int, S>;
 M m;
 m.insert_or_assign(0, Foo{}); // implicit construction - fine
 
@@ -1726,7 +1699,7 @@ typename LRUCache<K, V>::EntryPtr LRUCache<K, V>::Insert(const K& key, V value)
   if (m_entries.size() == m_capacity) Evict(1);
 
   // Insert the new value.
-  EntryPtr e = blz::make_shared<Entry>(key, blz::move(value));
+  EntryPtr e = std::make_shared<Entry>(key, blz::move(value));
   Append(e.get());
   m_entries[key] = e;
 
@@ -1753,8 +1726,8 @@ also weakly-referenced from a deque (see Append call)?
 #+BEGIN_SRC c++
 // Insert the new value.
 decltype(m_entries.begin()) it;
-blz::tie(it, blz::ignore) =
-  m_entries.emplace(key, blz::make_shared<Entry>(key, blz::move(value)));
+std::tie(it, std::ignore) =
+  m_entries.emplace(key, std::make_shared<Entry>(key, std::move(value)));
 Append(it->second.get());
 
 return it->second;
@@ -1809,17 +1782,17 @@ constructing one thing.
 
 implicit constructor
 #+BEGIN_SRC c++
-optional<S> opt = Foo{};
+std::optional<S> opt = Foo{};
 #+END_SRC
 
 ~explicit~ constructor (naive method)
 #+BEGIN_SRC c++
-optional<S> opt = S{1};
+std::optional<S> opt = S{1};
 #+END_SRC
 
 ~explicit~ constructor (in-place method)
 #+BEGIN_SRC c++
-optional<S> opt(in_place, 1);
+std::optional<S> opt(std::in_place, 1);
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -1836,19 +1809,19 @@ with an implicit constructor of course.
 
 implicit constructor
 #+BEGIN_SRC c++
-optional<S> opt;
+std::optional<S> opt;
 opt = Foo{};
 #+END_SRC
 
 ~explicit~ constructor (naive method)
 #+BEGIN_SRC c++
-optional<S> opt;
+std::optional<S> opt;
 opt = S{1};
 #+END_SRC
 
 ~explicit~ constructor (in-place method)
 #+BEGIN_SRC c++
-optional<S> opt;
+std::optional<S> opt;
 opt.emplace(1);
 #+END_SRC
 
@@ -1859,34 +1832,36 @@ Similar story here.
 ** ~optional~ recommendations
 
  - use the ~in_place_t~ constructor
- - use ~=~ for assignment, but avoid ~explicit~ construction
+ - avoid ~explicit~ construction
  - use ~emplace~ for assignment
 
 #+BEGIN_SRC c++
-optional<S> opt(in_place, 1);
-opt = Foo{};
+std::optional<S> opt(std::in_place, 1);
 opt.emplace(2);
 #+END_SRC
 
 #+BEGIN_NOTES
 You'll never go wrong with these.
+
+Again we could use the with_result_of to in-place construct the result of a
+function call.
 #+END_NOTES
 
 ** ~variant~ construction
 
 implicit constructor
 #+BEGIN_SRC c++
-variant<int, S> v = Foo{};
+std::variant<int, S> v = Foo{};
 #+END_SRC
 
 ~explicit~ constructor (naive method)
 #+BEGIN_SRC c++
-variant<int, S> v = S{1};
+std::variant<int, S> v = S{1};
 #+END_SRC
 
 ~explicit~ constructor (oops method)
 #+BEGIN_SRC c++
-variant<int, S> v = 1;
+std::variant<int, S> v = 1;
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -1902,11 +1877,11 @@ constructor explicit later on.
 Recommendation: use either of these two constructions.
 
 #+BEGIN_SRC c++
-variant<int, S> v(in_place_type<S>, 1);
+std::variant<int, S> v(std::in_place_type<S>, 1);
 #+END_SRC
 
 #+BEGIN_SRC c++
-variant<int, S> v(in_place_index<1>, 1);
+std::variant<int, S> v(std::in_place_index<1>, 1);
 #+END_SRC
 
 #+BEGIN_NOTES
@@ -1919,7 +1894,7 @@ multiple places in the ~variant~, which is relatively rarer.
 Similar story to construction.
 
 #+BEGIN_SRC c++
-variant<int, S> v;
+std::variant<int, S> v;
 
 v = Foo{}; // fine
 v = S{1};  // constructs a temporary
@@ -1931,13 +1906,13 @@ v = 1;     // oops
 Implicitly-typed ~variant~ construction/assignment can be dangerous.
 
 #+BEGIN_SRC c++
-variant<bool, string> v = "Hello";
-cout << "index is " << v.index() << '\n';
+int main() {
+  std::variant<bool, std::string> v = "Hello";
+  std::cout << "index is " << v.index() << '\n';
+}
 #+END_SRC
 
 What does this output?
-
-[[https://godbolt.org/g/Ybkubf][Compiler Explorer]]
 
 #+BEGIN_NOTES
 Avoid implicit type conversions. They're dangerous. The first possible one will apply.
@@ -1946,14 +1921,14 @@ Avoid implicit type conversions. They're dangerous. The first possible one will 
 ** Safe, efficient ~variant~ assignment
 
 #+BEGIN_SRC c++
-variant<int, S> v;
+std::variant<int, S> v;
 // template <class T, class... Args>
 // T& emplace(Args&&... args);
 v.emplace<S>(1);  // S{1}
 #+END_SRC
 
 #+BEGIN_SRC c++
-variant<int, S> v;
+std::variant<int, S> v;
 // template <size_t I, class... Args>
 // variant_alternative_t<I, variant>& emplace(Args&&... args);
 v.emplace<1>(1);  // S{1}
