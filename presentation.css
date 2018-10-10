@@ -29,7 +29,7 @@
 
     /* for dark theme */
     color: #dcdccc;
-    background-color: #000000;
+    background-color: #111111;
 
     /* for light theme */
     /* color: #222222; */
@@ -65,12 +65,14 @@
     padding-bottom: 6cm;
 }
 .reveal blockquote {
+    background-color: #111111;
     padding-right: 15px;
     padding-left: 15px;
 }
 .reveal blockquote .author {
     float: right;
     margin-right: 15px;
+    padding-top: 15px;
 }
 .reveal blockquote tt {
     font-style: normal;

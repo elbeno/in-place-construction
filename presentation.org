@@ -23,14 +23,13 @@
 * Title slide settings                                             :noexport:
 #+BEGIN_SRC emacs-lisp
 (setq org-reveal-title-slide
-(concat "<h2>%t</h2>"
+(concat "<h2>Everyday Efficiency:</h2><h2>In-place Construction</h2>"
 "<div class='vertspace2'></div>"
 "<blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p>"
 "<div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote>"
 "<div class='vertspace3'></div>"
 "<h3>%a / <a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3>"
 "<h4>%d</h4>"))
-(set-face-foreground 'font-lock-comment-face "dark green")
 #+END_SRC
 
 * Get Ready
