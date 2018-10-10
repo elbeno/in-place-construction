@@ -96,6 +96,11 @@ snippets of code behave.
 #+END_NOTES
 
 * 1. What happens when we ~move~ something?
+#+REVEAL_HTML: <div class='vertspace2'></div>
+#+REVEAL_HTML: <blockquote nil><p>&quot;Mov'd! In good time! Let him that mov'd you hither<br>remove you hence.&quot;</p>
+#+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>The Taming of the Shrew</em></div></blockquote>
+
+** A moved-from ~vector~
 #+BEGIN_SRC c++
 std::vector<int> v1 = {1, 2, 3, 4, 5};
 std::vector<int> v2 = std::move(v1);
@@ -319,7 +324,12 @@ The last two points here are useful a lot of the time for writing move
 constructors. You're going to be working in terms of the subobjects.
 #+END_NOTES
 
-* 2. Copy Elision (RVO)
+* 2. Copy Elision
+#+REVEAL_HTML: <div class='vertspace2'></div>
+#+REVEAL_HTML: <blockquote nil><p>&quot;If you will, lead these graces to the grave<br>And leave the world no copy.&quot;</p>
+#+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>Twelfth Night, or What You Will</em></div></blockquote>
+
+** Copy Elision, aka RVO
 
 What is the return value optimization?
 
@@ -760,6 +770,10 @@ Should you use ~push_back~ or should you use ~emplace_back~?
 
 How should you use them?
 
+#+REVEAL_HTML: <div class='vertspace2'></div>
+#+REVEAL_HTML: <blockquote nil><p>&quot;Didst thou not say, when I did push thee back --<br>Which was when I perceived thee -- that thou camest<br>From good descending?&quot;</p>
+#+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>Pericles</em></div></blockquote>
+
 ** ~push_back~ and ~emplace_back~
 
 #+BEGIN_SRC c++
@@ -1071,7 +1085,7 @@ Perfect forwarding and in-place construction.
 * 4. ~initializer_list~
 
 #+REVEAL_HTML: <div class='vertspace2'></div>
-#+REVEAL_HTML: <blockquote nil><p>&quot;I fear these stubborn lines lack power to move&quot;</p>
+#+REVEAL_HTML: <blockquote nil><p>&quot;I fear these stubborn lines lack power to move.&quot;</p>
 #+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>Love's Labours Lost</em></div></blockquote>
 
 ** What is ~initializer_list~?
@@ -1254,6 +1268,10 @@ I'm not sure what to recommend. Really the first point.
 (or other associative container)
 
 It's a bit complicated.
+
+#+REVEAL_HTML: <div class='vertspace2'></div>
+#+REVEAL_HTML: <blockquote nil><p>&quot;A plague upon it! I have forgot the map.&quot;</p>
+#+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>Henry IV, Part I</em></div></blockquote>
 
 #+BEGIN_NOTES
 When I say ~map~, I mean ~map~, ~unordered_map~, ~multimap~, ~unordered_multimap~,
@@ -1756,6 +1774,10 @@ Yes, C++ is complicated.
 
 Like ~optional~, ~variant~, ~any~.
 
+#+REVEAL_HTML: <div class='vertspace2'></div>
+#+REVEAL_HTML: <blockquote nil><p>&quot;There's more depends on this than on the value.&quot;</p>
+#+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>The Merchant of Venice</em></div></blockquote>
+
 ** ~optional~ and friends
 
 #+BEGIN_SRC c++
@@ -1945,6 +1967,12 @@ Obviously ~operator=~ is used implicitly by the compiler.
 #+END_NOTES
 
 * 7. Final Guidelines and Recommendations
+
+#+REVEAL_HTML: <div class='vertspace2'></div>
+#+REVEAL_HTML: <blockquote nil><p>&quot;Share the advice betwixt you; if both gain all,<br>The gift doth stretch itself as 'tis receiv'd,<br>And is enough for both.&quot;</p>
+#+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>All's Well That Ends Well</em></div></blockquote>
+
+** Recommendations
 
 Think about copies and moves.
 
