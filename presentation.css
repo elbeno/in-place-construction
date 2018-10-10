@@ -26,8 +26,14 @@
 
 .org-src-container pre {
     padding: 20px;
-    color: #222222;
-    background-color: #fdf6e3;
+
+    /* for dark theme */
+    color: #dcdccc;
+    background-color: #000000;
+
+    /* for light theme */
+    /* color: #222222; */
+    /* background-color: #fdf6e3; */
 }
 
 .reveal h2,
