@@ -18,6 +18,11 @@ function set_star(indexh, indexv) {
         // insert_or_assign
         8019: { display: 'block', innerHTML:'17' },
         8020: { display: 'block', innerHTML:'17' },
+        8021: { display: 'block', innerHTML:'17' },
+        // extract & insert
+        8022: { display: 'block', innerHTML:'17' },
+        // structured bindings
+        8024: { display: 'block', innerHTML:'17' },
 
         // optional, etc
         9001: { display: 'block', innerHTML:'17' },

@@ -1253,6 +1253,7 @@ decay to a char*, we're going to call strlen at some point.
    once
  - wait for an ~in_place_t~ constructor on ~vector~ ?
  - watch Jason's talk
+ - wait for P1249 (~std::forward~ from ~std::initializer_list~)?
 
 #+BEGIN_NOTES
 I'm not sure what to recommend. Really the first point.
@@ -1497,9 +1498,27 @@ Here's a problem: how can we tell ~emplace~ to zero-arg construct the value when
 we can't syntactically pass "zero arguments" in the place of an argument.
 
 We don't want to default-construct an S explicitly here and move it in.
+#+END_NOTES
 
-We could use ~operator[]~ but that would be weird. I don't like expression
-statements and I would probably write ~operator[]~ with nodiscard.
+
+** ~emplace~ problem
+
+What do we do when we want to default-construct the value?
+
+#+BEGIN_SRC c++
+using M = std::map<int, S>;
+M m;
+m[0]; // default construct S please!
+#+END_SRC
+
+#+ATTR_REVEAL: :frag (appear)
+ಠ_ಠ
+
+#+BEGIN_NOTES
+We could use ~operator[]~ but that would be weird.
+
+I don't like expression statements and I would probably write ~operator[]~ with
+nodiscard.
 
 Remember the ~value_type~ of the ~map~ is a ~pair~ - that's what ~emplace~ is
 trying to construct.
@@ -1677,8 +1696,6 @@ but difficult/impossible to make as efficient as map can as a member function.
 
 ** C++17: ~insert_or_assign~
 
-Yet another slightly different interface...
-
 #+BEGIN_SRC c++
 using M = std::map<int, S>;
 M m;
@@ -1692,6 +1709,35 @@ m.insert_or_assign(1, with_result_of([]{ return S{1}; })); // RVO
 Unfortunately there is no ~emplace_or_assign~. (In the assign case presumably
 could not avoid making a temporary to assign). But you can use the same
 ~with_result_of~ technique with ~insert_or_assign~.
+#+END_NOTES
+
+** In case you're not keeping count...
+
+We now have at least 3 different interface styles for putting things in a
+~map~...
+
+ - ~insert~ takes a ~value_type~ (aka ~pair~)
+ - ~emplace~ takes a parameter pack
+ - ~insert_or_assign~ takes a key and a value
+
+#+BEGIN_NOTES
+This is unfortunate.
+#+END_NOTES
+
+** And potentially a 4th!
+
+#+BEGIN_SRC c++
+using M = std::map<int, S>;
+M m;
+
+M m2{{1, Foo{}}}; // pretend initialization becomes efficient & simple
+
+m.insert(m2.extract(1));
+#+END_SRC
+
+#+BEGIN_NOTES
+Yet another way! If at some future time, initialization becomes simpler than the
+various ways to insert, this "idiom" could catch on...
 #+END_NOTES
 
 ** Exhibit H
@@ -1733,11 +1779,10 @@ also weakly-referenced from a deque (see Append call)?
 
 #+BEGIN_SRC c++
 // Insert the new value.
-decltype(m_entries.begin()) it;
-std::tie(it, std::ignore) =
-  m_entries.emplace(key, std::make_shared<Entry>(key, std::move(value)));
+auto [it, _] =
+  m_entries.emplace(key, with_result_of([&] {
+    return std::make_shared<Entry>(key, std::move(value)); });
 Append(it->second.get());
-
 return it->second;
 #+END_SRC
 
@@ -1745,7 +1790,7 @@ return it->second;
 + m_entries can still be any associative container (no loss of generality)
 + save 2 shared_ptr reference updates (plus check on assign of the default-constructed one)
 
-We could use with_result_of here to construct the shared_ptr directly in place.
+We use with_result_of here to construct the shared_ptr directly in place.
 #+END_NOTES
 
 ** Recommendations
