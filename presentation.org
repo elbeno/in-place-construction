@@ -49,9 +49,6 @@ I will be asking a lot of questions.
 
 I'm assuming everyone is using C++14, although most things we talk about will
 require no more than C++11. I'll mention a couple of C++17 features.
-
-Most of what you see is common to either ~blz~ or toolchain-STL. I've omitted
-namespaces from the slides for brevity.
 #+END_NOTES
 
 * Disclaimer
@@ -161,8 +158,8 @@ But the first example is small-string optimized. What happens when you move from
 a small string? You have to copy.
 
 What is the state of s1 in the first case? It happens that all major
-implementations (blz included) will set the size to zero on a move, even when in
-the small string buffer. So it's actually ever so slightly /slower/ than a copy.
+implementations will set the size to zero on a move, even when in the small
+string buffer. So it's actually ever so slightly /slower/ than a copy.
 
 If you're lucky, the optimizer can help you out and spot dead stores...
 
@@ -737,7 +734,7 @@ NRVO is not guaranteed in debug mode. Better:
 #+BEGIN_SRC c++
 unsigned long long Time() const override
 {
-  return blz::get<1>(Base::metrics_->GetDataPointAndTime());
+  return std::get<1>(Base::metrics_->GetDataPointAndTime());
 }
 #+END_SRC
 
@@ -786,8 +783,6 @@ reference emplace_back(Args&&... args);
 
 #+BEGIN_NOTES
 Until C++17, ~emplace_back~ returns ~void~.
-
-~blz~'s emplace_back returns a reference.
 #+END_NOTES
 
 ** Example 1
@@ -1431,8 +1426,7 @@ The second line forces a pair of type <int, S&&>, so you get one move after the
 initial construct.
 
 The third line makes a pair<int, int> then uses that pair to construct a pair of
-<int, S> in the map. This doesn't currently work with ~blz~. I'll get to why in
-a minute.
+<int, S> in the map.
 #+END_NOTES
 
 ** ~emplace~
@@ -1529,9 +1523,6 @@ Yes, we can also use this for more-than-one-arg constructors.
 
 #+BEGIN_NOTES
 Here's the piecewise constructor on ~pair~ again.
-
-This also gets around the ~blz~ limitation on ~explicit~ constructors with
-~emplace~. So there is a way to achieve optimality with ~blz~.
 #+END_NOTES
 
 ** Exhibit G
@@ -1716,7 +1707,7 @@ typename LRUCache<K, V>::EntryPtr LRUCache<K, V>::Insert(const K& key, V value)
   if (m_entries.size() == m_capacity) Evict(1);
 
   // Insert the new value.
-  EntryPtr e = std::make_shared<Entry>(key, blz::move(value));
+  EntryPtr e = std::make_shared<Entry>(key, std::move(value));
   Append(e.get());
   m_entries[key] = e;
 
