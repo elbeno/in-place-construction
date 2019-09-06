@@ -15,22 +15,12 @@
 #+TITLE: Everyday Efficiency: In-place Construction
 #+AUTHOR: Ben Deane
 #+EMAIL: bdeane@quantlab.com
-#+DATE: November 2018
+#+DATE: September 19 2018
 
 #+REVEAL_HTML: <script type="text/javascript" src="./rison.js"></script>
 #+REVEAL_HTML: <script type="text/javascript" src="./presentation.js"></script>
 
-* Title slide settings                                             :noexport:
-#+BEGIN_SRC emacs-lisp
-(setq org-reveal-title-slide
-(concat "<h2>Everyday Efficiency:</h2><h2>In-place Construction</h2>"
-"<div class='vertspace2'></div>"
-"<blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p>"
-"<div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote>"
-"<div class='vertspace3'></div>"
-"<h3>%a / <a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3>"
-"<h4>%d</h4>"))
-#+END_SRC
+#+REVEAL_TITLE_SLIDE: <h2>Everyday Efficiency:</h2><h2>In-place Construction</h2><div class='vertspace2'></div><blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote><div class='vertspace3'></div><h3>%a / <a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3><h4>%d</h4>
 
 * Get Ready
 
@@ -64,21 +54,21 @@ Let's make code better together!
 * Preliminaries
 
 #+BEGIN_SRC c++
-#include <stdio.h>
+#include <cstdio>
 
-struct Foo {};
+struct Arg {};
 
 struct S
 {
-  S() { puts("Default construct\n"); }
-  S(Foo) { puts("Value construct\n"); }
-  explicit S(int) { puts("Explicit value construct (1)\n"); }
-  explicit S(int, int) { puts("Explicit value construct (2)\n");}
-  ~S() { puts("Destruct\n"); }
-  S(const S&) { puts("Copy construct\n"); }
-  S(S&&) { puts("Move construct\n"); }
-  S& operator=(const S&) { puts("Copy assign\n"); return *this; }
-  S& operator=(S&&) { puts("Move assign\n"); return *this; }
+  S() { puts("Default construct"); }
+  S(Arg) { puts("Value construct"); }
+  explicit S(int) { puts("Explicit value construct (1)"); }
+  explicit S(int, int) { puts("Explicit value construct (2)");}
+  ~S() { puts("Destruct"); }
+  S(const S&) { puts("Copy construct"); }
+  S(S&&) { puts("Move construct"); }
+  S& operator=(const S&) { puts("Copy assign"); return *this; }
+  S& operator=(S&&) { puts("Move assign"); return *this; }
 };
 
 int main()

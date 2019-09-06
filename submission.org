@@ -1,0 +1,72 @@
+* Bio
+
+Ben Deane
+@ben_deane
+
+Ben was a game programmer for over 20 years, working in C++ since the late 90s
+for companies like EA and Blizzard. In 2018 he left the games industry to join
+Quantlab, an automated trading firm, where he writes modern, well-performing
+C++. He likes to play with algorithms, and to make the type system work for him,
+and he’s always looking for useful new techniques. Ben is the presenter of
+several previous C++Now and CppCon talks.
+
+* Title
+
+In-place Construction: The Routine Complexities of Efficiency
+
+* Tags
+
+efficiency, containers, move semantics
+
+* Session Type
+
+lecture
+
+* Session length
+
+Preferred: 60 minutes
+Minimum: 60 minutes
+Maximum: 60 minutes
+
+* Audience
+ - Intermediate
+ - Advanced
+ - Expert
+
+* Audience Description
+
+STL users, application developers, game developers
+
+* Description
+
+Efficient C++ has always been about minimizing copies. This practically-focused
+talk is about how to do that when working with move semantics, perfect
+forwarding and STL containers, or non-STL containers that present similar
+interfaces.
+
+In-place construction is an easily stated goal, but can be really fiddly to get
+right, especially given the foibles of various container interfaces. We'll talk
+about copy elision; when to use emplace, insert, or other methods; vectors,
+maps, optionals, variants; and how things change from C++11 through C++20.
+Attendees will learn why in-place construction is beneficial and exactly how to
+achieve optimal efficiency with the various standard container types.
+
+* Outline
+
+ - Why in-place construction is important
+ - Moves aren't necessarily cheap
+ - The rules and practicalities of copy elision
+   - when is RVO allowed?
+   - when will it actually happen?
+ - Sequence containers (vectors, deques)
+   - push_back vs emplace_back
+   - filling and generating containers with conversions
+ - Associative containers (sets, maps, ordered or otherwise)
+   - initialization vs updates
+   - insert vs emplace vs operator[]
+   - C++17's insert_or_assign
+   - n-argument construction
+   - in-place construction with conversions
+ - Other "containers"
+   - optional
+   - variant

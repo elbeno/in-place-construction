@@ -9,6 +9,7 @@ var version_txt = document.getElementsByClassName('text_over_img')[0];
 
 function set_star(indexh, indexv) {
     var slide_versions = {
+        2000: { display: 'block', innerHTML:'17' },
         // reference returned from vector emplace_back
         6001: { display: 'block', innerHTML:'17' },
         6003: { display: 'block', innerHTML:'17' },
@@ -34,8 +35,8 @@ function set_star(indexh, indexv) {
         9007: { display: 'block', innerHTML:'17' },
         9008: { display: 'block', innerHTML:'17' },
         9009: { display: 'block', innerHTML:'17' },
-   };
-    console.log("set star", indexh, " ", indexv);
+    };
+    console.log('set_star ' + indexh + ' ' + indexv);
     var slide_no = indexh * 1000 + indexv;
     var data = slide_versions[slide_no];
     if (data) {
@@ -47,9 +48,8 @@ function set_star(indexh, indexv) {
 }
 
 function encode_source(source) {
-    preamble = "http://localhost:10240/#g:!((g:!((g:!((h:codeEditor,i:(j:1,lang:c%2B%2B,source:'";
-    postamble = "'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:50,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B2a',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:63.657957244655584,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B',t:'0')),header:(),l:'4',m:36.342042755344416,n:'0',o:'',s:0,t:'0')),k:50,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4";
-
+    preamble = "http://localhost:10240/#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'"
+    postamble = "'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:69.35593220338983,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B2a',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:11.159420289855072,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B',t:'0')),header:(),l:'4',m:88.84057971014492,n:'0',o:'',s:0,t:'0')),k:30.644067796610173,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"
     if (source.indexOf("will_it_rvo") != -1) {
         source = '#include <stdio.h>\n\
 \n\
@@ -152,24 +152,40 @@ int main()\n\
 (function (window, undefined) {
     'use strict';
 
-    window.addEventListener('load', function () {
-        window.Reveal.addEventListener('slidechanged', function (event) {
+    window.addEventListener('ready', function () {
+
+        window.addEventListener('slidechanged', function (event) {
             // event.previousSlide, event.currentSlide, event.indexh, event.indexv
             set_star(event.indexh, event.indexv);
         });
 
-        var pres = document.getElementsByTagName('pre');
-        for(var i = 0; i < pres.length; i++) {
-            var pre = pres[i];
-            if (pre.className === 'src src-c++') {
-                pre.onclick = (function() {
+        var src_containers = document.getElementsByClassName('org-src-container');
+        for (var i = 0; i < src_containers.length; i++) {
+            var src_container = src_containers[i];
+            var pres = src_container.getElementsByClassName('src src-c++');
+            if (pres.length > 0) {
+                src_container.onclick = (function() {
+                    var self = src_container;
+                    var pre = pres[0];
+                    var orig_content = self.innerHTML;
                     var src = pre.textContent;
+                    var width = 0;
+                    var height = 0;
                     return function() {
-                        window.location.href = encode_source(src);
+                        if (width == 0) width = pre.clientWidth;
+                        if (height == 0) height = pre.clientHeight;
+                        if (orig_content == self.innerHTML) {
+                            self.innerHTML = '<iframe width="'
+                                + width + '" height="' + height
+                                + '" frameborder="0" src="'
+                                + encode_source(src) + '"/>';
+                        } else {
+                            self.innerHTML = orig_content;
+                        }
                     };
                 })();
-                pre.onauxclick = (function() {
-                    var src = pre.textContent;
+                src_container.onauxclick = (function() {
+                    var src = pres[0].textContent;
                     return function(e) {
                         if (e.which == 2) {
                             window.open(encode_source(src));
@@ -178,6 +194,16 @@ int main()\n\
                 })();
             }
         }
+
+        window.Reveal.addKeyBinding(
+            {keyCode:67, key:'C', description:'Toggle CE view of code'},
+            function () {
+                var slide = window.Reveal.getCurrentSlide();
+                var src_containers = slide.getElementsByClassName('org-src-container');
+                if (src_containers.length > 0) {
+                    src_containers[0].onclick();
+                }
+            });
     });
 
 })(window);
