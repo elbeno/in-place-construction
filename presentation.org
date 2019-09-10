@@ -22,7 +22,7 @@
 
 #+REVEAL_TITLE_SLIDE: <h2>Everyday Efficiency:</h2><h2>In-place Construction</h2><h3>Back to Basics?</h3><div class='vertspace2'></div><blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote><div class='vertspace3'></div><h3>%a / <a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3><h4>%d</h4>
 
-* Gubbins                                                          :noexport:
+* Settings                                                         :noexport:
 #+begin_source elisp
 (set-face-foreground 'font-lock-comment-face "magenta")
 (set-face-foreground 'font-lock-comment-delimiter-face "magenta")
@@ -579,7 +579,7 @@ std::string undecided_function()
 #+END_SRC
 Again, return value will still be moved.
 
-** Why is RVO important?
+** Why is RVO so important?
 
 #+BEGIN_SRC c++
 using M = std::map<std::string, int>;
@@ -607,6 +607,8 @@ Imagine this is using Microsoft's STL.
 #+begin_notes
 Microsoft's current ABI uses stable sentinel nodes. This means a move construct
 of a node-based container must allocate.
+
+(A move assign need not.)
 
 Practically the number one rule of performance is: you don't want to incur more
 allocations that you need to.
@@ -858,6 +860,22 @@ builds.
 Beware of the conditional operator.
 #+END_NOTES
 
+** Interlude
+#+REVEAL_HTML: <div class='vertspace2'></div>
+
+Before we continue...
+
+#+begin_notes
+A brief respite...
+
+Here's where we start to get into the nitty-gritty.
+
+Fair warning: there will probably come a time in this talk when you think, "why
+is C++ this complicated?"
+
+But for now, let's press on...
+#+end_notes
+
 * 3. Putting stuff into a ~vector~
 Should you use ~push_back~ or should you use ~emplace_back~?
 
@@ -866,6 +884,11 @@ How should you use them?
 #+REVEAL_HTML: <div class='vertspace2'></div>
 #+REVEAL_HTML: <blockquote nil><p>&quot;Didst thou not say, when I did push thee back --<br>Which was when I perceived thee -- that thou camest<br>From good descending?&quot;</p>
 #+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>Pericles</em></div></blockquote>
+
+#+begin_notes
+Let's avoid the tendency to think of ~emplace_back~ as magically being faster
+than ~push_back~.
+#+end_notes
 
 ** ~push_back~ and ~emplace_back~
 
@@ -878,6 +901,9 @@ reference emplace_back(Args&&... args);
 #+END_SRC
 
 #+BEGIN_NOTES
+These are the signatures provided by ~push_back~ and ~emplace_back~. Notice that
+~push_back~ is overloaded on rvalue references.
+
 Until C++17, ~emplace_back~ returns ~void~.
 #+END_NOTES
 
@@ -896,6 +922,8 @@ v.emplace_back(std::move(s));
 
 #+BEGIN_NOTES
 There is no difference.
+
+Well there is one difference... if you're on C++17 or later.
 #+END_NOTES
 
 ** Example 1.1
@@ -905,6 +933,7 @@ What's the difference here?
 #+BEGIN_SRC c++
 std::vector<std::string> v;
 std::string s;
+// ...
 
 v.push_back(std::move(s));
 std::string& last_s = v.emplace_back(std::move(s));
@@ -922,12 +951,15 @@ What's the difference here?
 #+BEGIN_SRC c++
 std::vector<std::string> v;
 const char* s = "Hello";
+// ...
 
 v.push_back(s);
 v.emplace_back(s);
 #+END_SRC
 
 #+BEGIN_NOTES
+This is the real proper usage of ~emplace_back~.
+
 ~push_back~ constructs a temporary then moves it.
 
 ~emplace_back~ constructs directly in place.
@@ -952,6 +984,9 @@ S& s = v.emplace_back();
 ~emplace_back~ takes a parameter pack. Parameter packs can be empty.
 
 #+BEGIN_NOTES
+In the upcoming slides, we're going to be using the ~S~ struct from the top of
+the talk.
+
 ~emplace_back~ is especially useful for this use case.
 #+END_NOTES
 
@@ -977,12 +1012,12 @@ S& s = v.emplace_back(1);
 #+END_NOTES
 
 ** Example: copy
-Recall: our ~S~ class has a constructor from ~Foo~, and an ~explicit~ constructor
+Recall: our ~S~ class has a constructor from ~Arg~, and an ~explicit~ constructor
 from ~int~.
 
 #+BEGIN_SRC c++
 std::vector<S> v;
-std::array<Foo, 3> a = { Foo{}, Foo{}, Foo{} };
+std::array<Arg, 3> a = { Arg{}, Arg{}, Arg{} };
 v.reserve(a.size());
 
 std::copy(a.cbegin(), a.cend(), std::back_inserter(v));
@@ -991,7 +1026,7 @@ std::copy(a.cbegin(), a.cend(), std::back_inserter(v));
 What does ~back_insert_iterator~ do here?
 
 #+BEGIN_NOTES
-For each element, we construct an ~S~ (from the ~Foo~) and then we move it into
+For each element, we construct an ~S~ (from the ~Arg~) and then we move it into
 the ~vector~.
 #+END_NOTES
 
@@ -1055,6 +1090,15 @@ private:
 };
 #+END_SRC
 
+(Slideware - some details omitted)
+
+#+begin_notes
+Here's an alternative: instead of using ~back_inserter~, let's create a
+~back_emplacer~ iterator that calls ~emplace_back~ instead of ~push_back~.
+
+(Some details omitted for slide.)
+#+end_notes
+
 ** ~back_emplacer~
 #+BEGIN_SRC c++
 // pre-CTAD maker function
@@ -1065,6 +1109,11 @@ auto back_emplacer(Container& c)
   return back_emplace_iterator<Container>(c);
 }
 #+END_SRC
+(Or write a deduction guide for C++17)
+
+#+begin_notes
+If you have C++17, you can write a deduction guide instead.
+#+end_notes
 
 ** ~back_emplacer~
 What if we have an ~array~ of ~int~?
@@ -1076,6 +1125,11 @@ v.reserve(a.size());
 
 std::copy(a.cbegin(), a.cend(), back_emplacer(v));
 #+END_SRC
+The compiler is happy now! And we get in-place construction.
+
+#+begin_notes
+Now it works fine, and achieves in-place construction.
+#+end_notes
 
 ** Exhibit D
 #+BEGIN_SRC c++
@@ -1086,6 +1140,8 @@ tokens.emplace_back(std::move(token));
 #+END_SRC
 
 #+BEGIN_NOTES
+Here's some code I saw that was trying really hard to be efficient.
+
 A few things here:
  - ~string_view~ is a pointer + length. recommendation is to pass by value;
    ~move~ gains nothing anyway.
@@ -1096,19 +1152,20 @@ A few things here:
 ** Exhibit E
 
 #+BEGIN_SRC c++
-context->m_result->m_headers.emplace_back(std::string(headerData, numBytes));
+m_headers.emplace_back(std::string(headerData, numBytes));
 #+END_SRC
 
 A superfluous move! Better:
 
 #+BEGIN_SRC c++
-context->m_result->m_headers.emplace_back(headerData, numBytes);
+m_headers.emplace_back(headerData, numBytes);
 #+END_SRC
 
 Don't explicitly call a constructor with ~emplace_back~.
 
 #+BEGIN_NOTES
-And remember, likely a superfluous copy if the string is small-buffer-optimized.
+And remember, likely a superfluous "copy" if the string is
+small-buffer-optimized.
 #+END_NOTES
 
 ** ~vector~ of ~pair~ = ~map~
@@ -1117,19 +1174,29 @@ Sometimes, we use a  sorted ~vector~ of ~pair~ as a replacement for ~map~.
 What do you do if part of your ~pair~ has a multi-argument constructor?
 
 #+BEGIN_SRC c++
-struct Foo { Foo(int, std::string, double); };
+struct Value { Value(int, std::string, double); };
 
-std::vector<std::pair<int, Foo>> v;
+std::vector<std::pair<int, Value>> v;
 
 // this is very common!
-v.push_back(std::make_pair(1, Foo{42, "hello", 3.14}));
+v.push_back(std::make_pair(1, Value{42, "hello", 3.14}));
 
 // this is no better
-v.emplace_back(std::make_pair(1, Foo{42, "hello", 3.14}));
+v.emplace_back(std::make_pair(1, Value{42, "hello", 3.14}));
 
 // how can we do better?
 v.emplace_back( /* what here? */ );
 #+END_SRC
+
+#+begin_notes
+Either ~push_back~ or ~emplace_back~ do the same thing:
+
+- we explicitly asking for a temporary to be constructed
+- it gets moved into the pair
+- the pair gets moved into the vector
+
+2 extra moves!
+#+end_notes
 
 ** ~piecewise_construct~ to the rescue!
 
@@ -1147,22 +1214,32 @@ constexpr tuple<Types&&...> forward_as_tuple(Types&&... args) noexcept;
 
 ~piecewise_construct_t~ is a tag type.
 
+#+begin_notes
+~piecewise_construct_t~ is a tag type whose singleton value is
+~piecewise_construct~.
+#+end_notes
+
 ** Using ~piecewise_construct~
 #+BEGIN_SRC c++
-struct Foo { Foo(int, std::string, double); };
+struct Value { Value(int, std::string, double); };
 
-std::vector<std::pair<int, Foo>> v;
+std::vector<std::pair<int, Value>> v;
 
 // instead of this...
-v.push_back(std::make_pair(1, Foo{42, "hello", 3.14}));
+v.push_back(std::make_pair(1, Value{42, "hello", 3.14}));
 
 // ...we can do this
 v.emplace_back(
   std::piecewise_construct,
   std::forward_as_tuple(1),                   // args to int "constructor"
-  std::forward_as_tuple(42, "hello", 3.14))); // args to Foo constructor
+  std::forward_as_tuple(42, "hello", 3.14))); // args to Value constructor
 #+END_SRC
 Perfect forwarding and in-place construction.
+
+#+begin_notes
+OK, so it's verbose. And on slideware, it's not compelling. But C++ is about "no
+distributed fat" - optimality is possible. And when you need it, you need it.
+#+end_notes
 
 ** Recommendations
  - ~push_back~ is perfectly fine for rvalues
@@ -1170,8 +1247,15 @@ Perfect forwarding and in-place construction.
    - in-place construction (including nullary construction)
    - a reference to what's added (C++17)
  - never pass an explicit temporary to ~emplace_back~
- - try to construct in place when you can
  - use ~piecewise_construct~ / ~forward_as_tuple~ to forward args through ~pair~
+
+#+begin_notes
+You can use ~emplace_back~ for rvalues, but I like to follow the "rule of least
+power" - that is, to use the least powerful thing that will do the job.
+~emplace_back~ is very powerful and probably requires more effort to understand
+the call site than ~push_back~ so if I just have an rvalue, I'll prefer to use
+~push_back~.
+#+end_notes
 
 * 4. ~initializer_list~
 
@@ -1202,12 +1286,12 @@ auto f() ()
   return std::initializer_list<int>{ Is... };
 }
 
-void foo() {
+void fine() {
   for (int i: {1,2,3})
     cout << i << '\n';
 }
 
-void bar() {
+void works_fine_until_it_explodes() {
   for (int i: f<1,2,3>())
     cout << i << '\n';
 }
@@ -1263,7 +1347,7 @@ It's way worse than the second version for types with more than trivial
 construction.
 #+END_NOTES
 
-** We can make it a little better...
+** We can make it a little(?) better...
 
 #+BEGIN_SRC c++
 std::vector<S> v = { S{1}, S{2}, S{3} };
@@ -1286,24 +1370,30 @@ template <class... Args>
 explicit vector(in_place_t, Args&&... args);
 #+END_SRC
 
-Future (?) proposal by Simon Brand.
-
+There is some work going on here, e.g. future (?) proposal by Sy Brand & Chris
+Di Bella...
 https://wg21.tartanllama.xyz/initializer_list
+
+#+begin_notes
+I'm not sure if this proposal will see publication, but I think there is some
+work going on around initializer_list.
+#+end_notes
 
 ** Exhibit F
 #+BEGIN_SRC c++
 std::unordered_set<std::string> kKeywords = {
-	"alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
-	"bool", "break", "case", "catch", "char", "class", "compl", "const",
-	"constexpr", "const_cast", "continue", "decltype", "default", "delete", "do",
-	"double", "dynamic_cast", "else", "enum", "explicit", "extern", "false",
-	"float", "for", "friend", "goto", "if", "inline", "int", "long", "mutable",
-	"namespace", "new", "noexcept", "not", "not_eq", "NULL", "operator", "or",
-	"or_eq", "private", "protected", "public", "register", "reinterpret_cast",
-	"return", "short", "signed", "sizeof", "static", "static_assert",
-	"static_cast", "struct", "switch", "template", "this", "thread_local",
-	"throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned",
-	"using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
+    "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
+    "bool", "break", "case", "catch", "char", "class", "compl", "const",
+    "constexpr", "const_cast", "continue", "decltype", "default", "delete",
+    "do", "double", "dynamic_cast", "else", "enum", "explicit", "extern",
+    "false", "float", "for", "friend", "goto", "if", "inline", "int", "long",
+    "mutable", "namespace", "new", "noexcept", "not", "not_eq", "NULL",
+    "operator", "or", "or_eq", "private", "protected", "public", "register",
+    "reinterpret_cast", "return", "short", "signed", "sizeof", "static",
+    "static_assert", "static_cast", "struct", "switch", "template", "this",
+    "thread_local", "throw", "true", "try", "typedef", "typeid", "typename",
+    "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t",
+    "while", "xor", "xor_eq"
 };
 #+END_SRC
 
@@ -1347,12 +1437,12 @@ decay to a char*, we're going to call strlen at some point.
  - consider using ~array~ and manually moving
  - probably don't use ~initializer_list~ for anything that'll get run more than
    once
- - wait for an ~in_place_t~ constructor on ~vector~ ?
+ - wait for an ~in_place_t~ constructor on ~vector~?
+ - wait for more work on ~std::initializer_list~?
  - watch Jason's talk
- - wait for P1249 (~std::forward~ from ~std::initializer_list~)?
 
 #+BEGIN_NOTES
-I'm not sure what to recommend. Really the first point.
+I'm not sure what to recommend. Really the first point, and the last.
 #+END_NOTES
 
 * 5. Putting stuff into a ~map~
@@ -1378,10 +1468,10 @@ to refer to just the value in the map and not the key, it's called the
 
 It's perfectly possible to initialize a map with an ~initializer_list~.
 #+BEGIN_SRC c++
-// recall S has an implicit constructor from Foo
+// recall S has an implicit constructor from Arg
 
 using M = std::map<int, S>;
-M m { {0, Foo{}} }; // how many constructs/copies/moves?
+M m { {0, Arg{}} }; // how many constructs/copies/moves?
 #+END_SRC
 
 Use aggregate initialization with ~pair~.
@@ -1400,7 +1490,7 @@ If you have explicit constructors you might need to explicitly call out the type
 
 ** Alternative: templatery
 
-https://gist.github.com/elbeno/609e929ef6898f09e96a#file-for_each_args-cpp-L55
+(Originally? by Vittorio Romeo)
 #+BEGIN_SRC c++
 // call an N-ary function on each lot of N args passed in
 template <size_t N, typename F, typename... Ts>
@@ -1438,7 +1528,7 @@ for_each_n_args<3>(
       m.emplace(
         std::piecewise_construct,
         std::forward_as_tuple(std::forward<decltype(k)>(k)),
-        std::forward_as_tuple(std::forward<decltype(v)>(v)...); },
+        std::forward_as_tuple(std::forward<decltype(v)>(v)...)); },
   0, 1, 2); // explicit multi-arg value constructor
 #+END_SRC
 
@@ -1450,8 +1540,8 @@ Here we are calling S's two-arg constructor.
 ~for_each_n_args~ also works with vector (including vector-of-pair) as an
 alternative to ~initializer_list~
 
-There are some issues with calling ~explicit~ constructors... it depends on the
-compiler/library. It is supposed to work.
+With modern compilers, this works; with older MSVC compilers I ran into some
+issues with calling ~explicit~ constructors.
 #+END_NOTES
 
 ** Enough about initializing
@@ -1461,13 +1551,13 @@ How about putting things into an existing ~map~?
 ** The Easy Way: ~operator[]~
 
 #+BEGIN_SRC c++
-// recall S has an implicit constructor from Foo
+// recall S has an implicit constructor from Arg
 // but an explicit constructor from int
 
 using M = std::map<int, S>;
 M m;
 m[0] = S{1};
-m[1] = Foo{};
+m[1] = Arg{};
 #+END_SRC
 
 How many constructs/moves/copies?
@@ -1492,7 +1582,7 @@ a map, if you never use this function. And that can be a significant thing.
 ** The Other Easy Way: ~insert~
 
 #+BEGIN_SRC c++
-// recall S has an implicit constructor from Foo
+// recall S has an implicit constructor from Arg
 // but an explicit constructor from int
 
 using M = std::map<int, S>;
@@ -1523,7 +1613,8 @@ The second line forces a pair of type <int, S&&>, so you get one move after the
 initial construct.
 
 The third line makes a pair<int, int> then uses that pair to construct a pair of
-<int, S> in the map.
+<int, S> in the map. This works because pair's constructor is conditionally
+explicit?
 #+END_NOTES
 
 ** ~emplace~
@@ -1531,7 +1622,7 @@ The third line makes a pair<int, int> then uses that pair to construct a pair of
 Enter the /wonderful C++11 panacea/ that is move semantics.
 
 #+BEGIN_SRC c++
-// recall S has an implicit constructor from Foo
+// recall S has an implicit constructor from Arg
 // but an explicit constructor from int
 
 using M = std::map<int, S>;
@@ -1556,7 +1647,7 @@ Don't do this. It is /exactly/ the same as ~insert~ here. Two moves.
 ** ~emplace~, better usage
 
 #+BEGIN_SRC c++
-// recall S has an implicit constructor from Foo
+// recall S has an implicit constructor from Arg
 // but an explicit constructor from int
 
 using M = std::map<int, S>;
@@ -1644,7 +1735,9 @@ Here's the piecewise constructor on ~pair~ again.
 
 #+BEGIN_SRC c++
 // explicit ClientIdRecord(
-//  const string& clientId, const ProcessId& clientProc, const ProcessId& serverProc);
+//    const string& clientId,
+//    const ProcessId& clientProc,
+//    const ProcessId& serverProc);
 
 using Storage = std::unordered_set<ClientIdRecord>;
 Storage m_storage;
@@ -1667,7 +1760,9 @@ One in-place construct. This is fine.
 
 #+BEGIN_SRC c++
 // explicit ClientIdRecord(
-//  const string& clientId, const ProcessId& clientProc, const ProcessId& serverProc);
+//    const string& clientId,
+//    const ProcessId& clientProc,
+//    const ProcessId& serverProc);
 
 using Storage = std::unordered_map<std::string, ClientIdRecord>;
 Storage m_storage;
@@ -1679,7 +1774,8 @@ m_storage.emplace(
 Is this optimal?
 
 #+BEGIN_NOTES
-2 extra moves here.
+2 extra moves here now, because we switched from a set to map and wrote the
+naive code.
 
 How do we do better?
 #+END_NOTES
@@ -1695,6 +1791,11 @@ m_storage.emplace(std::piecewise_construct,
 #+END_SRC
 
 Use ~piecewise_construct~ again.
+
+#+begin_notes
+So easy to make a change like this and miss it in code review and incur
+penalties.
+#+end_notes
 
 ** ~emplace~ problem 2
 
@@ -1714,11 +1815,17 @@ How can we avoid the move?
 
 Is it possible to in-place construct here?
 
+#+begin_notes
+~get_S()~ will be evaluated and produce an rvalue before we call ~emplace~, so
+we'll get a construct and a move.
+#+end_notes
+
 ** In-place construct a function call result
+#+REVEAL_HTML: <div class='vertspace2'></div>
 
 We can't avoid evaluating the function call before calling ~emplace~.
 
-But, we can control when the result of the function call becomes an ~S~.
+But we can control when the result of the function call becomes an ~S~.
 
 ** In-place construct a function call result
 
@@ -1726,8 +1833,8 @@ But, we can control when the result of the function call becomes an ~S~.
 template <typename F>
 struct with_result_of_t
 {
-  using T = std::result_of_t<F()>;
-  explicit with_result_of_t(F f) : f(std::move(f)) {}
+  using T = std::invoke_result_t<F>;
+  explicit with_result_of_t(F&& f) : f(std::forward<F>(f)) {}
   operator T() { return f(); }
 
 private:
@@ -1740,6 +1847,9 @@ inline auto with_result_of(F&& f) {
   return with_result_of_t<F>(std::forward<F>(f));
 }
 #+END_SRC
+[[https://quuxplusone.github.io/blog/2018/05/17/super-elider-round-2/][Superconstructing super elider]], Arthur O'Dwyer
+
+[[https://akrzemi1.wordpress.com/2018/05/16/rvalues-redefined/][Rvalues redefined]], Andrzej Krzemieński
 
 #+BEGIN_NOTES
 Capture the function and call it only at the point that we want to convert the
@@ -1763,6 +1873,9 @@ m.emplace(0, with_result_of([] { return get_S(); }));
 Compilers are really good at optimizing single-use lambdas.
 
 #+BEGIN_NOTES
+In general, compilers do better here with the lambda than with the free
+function.
+
 You would think the second line here would work just as well. But VC++
 doesn't manage to elide the move.
 #+END_NOTES
@@ -1795,7 +1908,7 @@ but difficult/impossible to make as efficient as map can as a member function.
 #+BEGIN_SRC c++
 using M = std::map<int, S>;
 M m;
-m.insert_or_assign(0, Foo{}); // implicit construction - fine
+m.insert_or_assign(0, Arg{}); // implicit construction - fine
 
 // m.insert_or_assign(1, 1);  // explicit construction - error!
 m.insert_or_assign(1, with_result_of([]{ return S{1}; })); // RVO
@@ -1809,31 +1922,27 @@ could not avoid making a temporary to assign). But you can use the same
 
 ** In case you're not keeping count...
 
-We now have at least 3 different interface styles for putting things in a
-~map~...
+We now have at least +3+ +4+ +5+ N (>5) different /interface styles/ for putting
+things in a ~map~...
 
  - ~insert~ takes a ~value_type~ (aka ~pair~)
+   - or an iterator pair
+   - or an ~initializer_list~
+   - or a node
  - ~emplace~ takes a parameter pack
- - ~insert_or_assign~ takes a key and a value
+ - ~try_emplace~ takes a key and a parameter pack
+ - ~insert_or_assign~ takes a key and [something convertible to] a value
+   - so does ~operator[]~
+ - ~merge~ takes another map...
 
 #+BEGIN_NOTES
 This is unfortunate.
-#+END_NOTES
 
-** And potentially a 4th!
+Remember when I said you'd probably reach a point in this talk when you thought
+C++ is too complicated?
 
-#+BEGIN_SRC c++
-using M = std::map<int, S>;
-M m;
-
-M m2{{1, Foo{}}}; // pretend initialization becomes efficient & simple
-
-m.insert(m2.extract(1));
-#+END_SRC
-
-#+BEGIN_NOTES
-Yet another way! If at some future time, initialization becomes simpler than the
-various ways to insert, this "idiom" could catch on...
+Actually, you probably already reached that point about 20 slides back, didn't
+you...
 #+END_NOTES
 
 ** Exhibit H
@@ -1889,6 +1998,29 @@ return it->second;
 We use with_result_of here to construct the shared_ptr directly in place.
 #+END_NOTES
 
+** ~emplace~ & ~emplace_back~ epilogue
+
+What to do if ~mapped_type~ is an aggregate? You want the rule of zero.
+
+C++20 [[http://wg21.link/p0960][P0960]]: Aggregate initialization with parentheses.
+
+#+begin_src c++
+using M = std::map<int, Aggregate>;
+
+M m;
+m.emplace(std::piecewise_construct,
+          std::forward_as_tuple(1),
+          std::forward_as_tuple(/* members of Aggregate */));
+#+end_src
+
+#+begin_notes
+In C++20, we get parenthesized initialization for aggregate types.
+
+This should mean you can get in-place construction for them too without
+moving(copying) and without tediously having to provide SMFs to achieve
+optimality.
+#+end_notes
+
 ** Recommendations
 
 Yes, C++ is complicated.
@@ -1899,8 +2031,9 @@ Yes, C++ is complicated.
  - Use ~emplace~ but beware of explicit construction
  - Use ~piecewise_construct~ for other than single-arg construction
  - Try to avoid ~operator[]~
- - Adopt ~insert_or_assign~ when it's available
+ - Adopt ~insert_or_assign~ when you can
  - Consider ~with_result_of~
+ - Aggregates will suck until C++20
 
 * 6. Putting stuff into other things
 
@@ -1909,6 +2042,10 @@ Like ~optional~, ~variant~, ~any~.
 #+REVEAL_HTML: <div class='vertspace2'></div>
 #+REVEAL_HTML: <blockquote nil><p>&quot;There's more depends on this than on the value.&quot;</p>
 #+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>The Merchant of Venice</em></div></blockquote>
+
+#+begin_notes
+This is where it gets a lot easier.
+#+end_notes
 
 ** ~optional~ and friends
 
@@ -1935,7 +2072,7 @@ constructing one thing.
 
 implicit constructor
 #+BEGIN_SRC c++
-std::optional<S> opt = Foo{};
+std::optional<S> opt = Arg{};
 #+END_SRC
 
 ~explicit~ constructor (naive method)
@@ -1963,7 +2100,7 @@ with an implicit constructor of course.
 implicit constructor
 #+BEGIN_SRC c++
 std::optional<S> opt;
-opt = Foo{};
+opt = Arg{};
 #+END_SRC
 
 ~explicit~ constructor (naive method)
@@ -2004,7 +2141,7 @@ function call.
 
 implicit constructor
 #+BEGIN_SRC c++
-std::variant<int, S> v = Foo{};
+std::variant<int, S> v = Arg{};
 #+END_SRC
 
 ~explicit~ constructor (naive method)
@@ -2049,10 +2186,14 @@ Similar story to construction.
 #+BEGIN_SRC c++
 std::variant<int, S> v;
 
-v = Foo{}; // fine
+v = Arg{}; // fine
 v = S{1};  // constructs a temporary
 v = 1;     // oops
 #+END_SRC
+
+#+begin_notes
+Trying to put an ~S~ in the ~variant~ here, accidentally putting an integer in.
+#+end_notes
 
 ** ~variant~ danger!
 
@@ -2067,8 +2208,13 @@ int main() {
 
 What does this output?
 
+#+ATTR_REVEAL: :frag (appear)
+C++20 P0608 A sane variant converting constructor
+
 #+BEGIN_NOTES
 Avoid implicit type conversions. They're dangerous. The first possible one will apply.
+
+This is fixed in 20. (Prevent narrowing conversions and conversions to bool.)
 #+END_NOTES
 
 ** Safe, efficient ~variant~ assignment
@@ -2105,6 +2251,7 @@ Obviously ~operator=~ is used implicitly by the compiler.
 #+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>All's Well That Ends Well</em></div></blockquote>
 
 ** Recommendations
+#+REVEAL_HTML: <div class='vertspace2'></div>
 
 Think about copies and moves.
 
@@ -2114,6 +2261,6 @@ Usually, in-place construction is preferable. And it is nearly always possible.
 
 Know how RVO works, and check that the compiler is doing it when you think it is.
 
-Beware ~initializer_list~.
+Study the interfaces of the containers you're using.
 
-Feel free to ping me with any questions, any time.
+Beware ~initializer_list~.

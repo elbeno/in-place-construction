@@ -51,18 +51,72 @@ function set_star(indexh, indexv) {
 
         // reference returned from vector emplace_back
         6001: { display: 'block', innerHTML:'17' },
+        6002: { display: 'block', innerHTML:'11' },
         6003: { display: 'block', innerHTML:'17' },
+        6004: { display: 'block', innerHTML:'11' },
         6005: { display: 'block', innerHTML:'17' },
         6006: { display: 'block', innerHTML:'17' },
+
+        // copy example
+        6007: { display: 'block', innerHTML:'11' },
+        6008: { display: 'block', innerHTML:'11' },
+        6009: { display: 'block', innerHTML:'11' },
+        6010: { display: 'block', innerHTML:'11' },
+        6011: { display: 'block', innerHTML:'11' },
+        6012: { display: 'block', innerHTML:'11' },
+
+        // Exhibits D & E
+        6013: { display: 'block', innerHTML:'17' },
+        6014: { display: 'block', innerHTML:'11' },
+
+        // vector-of-pairs
+        6015: { display: 'block', innerHTML:'11' },
+        6016: { display: 'block', innerHTML:'11' },
+        6017: { display: 'block', innerHTML:'11' },
+
+        // initializer_list
+        7001: { display: 'block', innerHTML:'11' },
+        7002: { display: 'block', innerHTML:'11' },
+        7003: { display: 'block', innerHTML:'14' },
+        7004: { display: 'block', innerHTML:'11' },
+        7005: { display: 'block', innerHTML:'11' },
+        7006: { display: 'block', innerHTML:'??' },
+        7007: { display: 'block', innerHTML:'11' },
+
+        // map init
+        8001: { display: 'block', innerHTML:'11' },
+        8002: { display: 'block', innerHTML:'14' },
+        8003: { display: 'block', innerHTML:'14' },
+
+        // map insert
+        8005: { display: 'block', innerHTML:'98' },
+        8006: { display: 'block', innerHTML:'11' },
+        8007: { display: 'block', innerHTML:'11' },
+        8008: { display: 'block', innerHTML:'11' },
+        8009: { display: 'block', innerHTML:'11' },
+        8010: { display: 'block', innerHTML:'11' },
+        8011: { display: 'block', innerHTML:'11' },
+
+        // exhibit G
+        8012: { display: 'block', innerHTML:'11' },
+        8013: { display: 'block', innerHTML:'11' },
+        8014: { display: 'block', innerHTML:'11' },
+
+        // emplace function call result
+        8015: { display: 'block', innerHTML:'11' },
+        8017: { display: 'block', innerHTML:'17' },
+        8018: { display: 'block', innerHTML:'17' },
 
         // insert_or_assign
         8019: { display: 'block', innerHTML:'17' },
         8020: { display: 'block', innerHTML:'17' },
-        8021: { display: 'block', innerHTML:'17' },
-        // extract & insert
-        8022: { display: 'block', innerHTML:'17' },
-        // structured bindings
-        8024: { display: 'block', innerHTML:'17' },
+
+        // Exhibit H
+        8022: { display: 'block', innerHTML:'11' },
+        8023: { display: 'block', innerHTML:'17' },
+
+        // aggregate initialization with parens
+        8024: { display: 'block', innerHTML:'20' },
 
         // optional, etc
         9001: { display: 'block', innerHTML:'17' },
@@ -90,14 +144,14 @@ function encode_source(source) {
     preamble = "http://localhost:10240/#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'"
     postamble = "'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:69.35593220338983,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B2a',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:11.159420289855072,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B',t:'0')),header:(),l:'4',m:88.84057971014492,n:'0',o:'',s:0,t:'0')),k:30.644067796610173,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"
     if (source.indexOf("will_it_rvo") != -1) {
-        source = '#include <stdio.h>\n\
+        source = '#include <cstdio>\n\
 \n\
-struct Foo {};\n\
+struct Arg {};\n\
 \n\
 struct S\n\
 {\n\
   S() { puts("Default construct\\n"); }\n\
-  S(Foo) { puts("Value construct\\n"); }\n\
+  S(Arg) { puts("Value construct\\n"); }\n\
   explicit S(int) { puts("Explicit value construct (1)\\n"); }\n\
   explicit S(int, int) { puts("Explicit value construct (2)\\n");}\n\
   ~S() { puts("Destruct\\n"); }\n\
@@ -133,14 +187,14 @@ int main()\n\
 }';
         }
     } else if (source.indexOf('S>') != -1) {
-        source = '#include <stdio.h>\n\
+        source = '#include <cstdio>\n\
 \n\
-struct Foo {};\n\
+struct Arg {};\n\
 \n\
 struct S\n\
 {\n\
   S() { puts("Default construct\\n"); }\n\
-  S(Foo) { puts("Value construct\\n"); }\n\
+  S(Arg) { puts("Value construct\\n"); }\n\
   explicit S(int) { puts("Explicit value construct (1)\\n"); }\n\
   explicit S(int, int) { puts("Explicit value construct (2)\\n");}\n\
   ~S() { puts("Destruct\\n"); }\n\
