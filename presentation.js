@@ -9,7 +9,46 @@ var version_txt = document.getElementsByClassName('text_over_img')[0];
 
 function set_star(indexh, indexv) {
     var slide_versions = {
-        2000: { display: 'block', innerHTML:'17' },
+        // explaining the star
+        1000: { display: 'block', innerHTML:'17' },
+        // "preliminaries"
+        3000: { display: 'block', innerHTML:'11' },
+
+        // what's in a moved-from vector?
+        4001: { display: 'block', innerHTML:'11' },
+        // Exhibit A
+        4003: { display: 'block', innerHTML:'11' },
+        4004: { display: 'block', innerHTML:'11' },
+
+        // Exhibit B
+        4006: { display: 'block', innerHTML:'11' },
+        // exchange std::function with nullptr
+        4007: { display: 'block', innerHTML:'14' },
+
+        // RVO in pictures
+        5002: { display: 'block', innerHTML:'98' },
+
+        // RVO examples
+        5005: { display: 'block', innerHTML:'98' },
+        5006: { display: 'block', innerHTML:'11' },
+        5007: { display: 'block', innerHTML:'11' },
+        5008: { display: 'block', innerHTML:'98' },
+
+        // Will it RVO?
+        5012: { display: 'block', innerHTML:'11' },
+        5013: { display: 'block', innerHTML:'11' },
+        5014: { display: 'block', innerHTML:'11' },
+        5015: { display: 'block', innerHTML:'11' },
+        5016: { display: 'block', innerHTML:'11' },
+        5017: { display: 'block', innerHTML:'11' },
+        5018: { display: 'block', innerHTML:'11' },
+        5019: { display: 'block', innerHTML:'11' },
+        5020: { display: 'block', innerHTML:'11' },
+        5021: { display: 'block', innerHTML:'11' },
+
+        // Exhibit C
+        5022: { display: 'block', innerHTML:'11' },
+
         // reference returned from vector emplace_back
         6001: { display: 'block', innerHTML:'17' },
         6003: { display: 'block', innerHTML:'17' },

@@ -20,9 +20,44 @@
 #+REVEAL_HTML: <script type="text/javascript" src="./rison.js"></script>
 #+REVEAL_HTML: <script type="text/javascript" src="./presentation.js"></script>
 
-#+REVEAL_TITLE_SLIDE: <h2>Everyday Efficiency:</h2><h2>In-place Construction</h2><div class='vertspace2'></div><blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote><div class='vertspace3'></div><h3>%a / <a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3><h4>%d</h4>
+#+REVEAL_TITLE_SLIDE: <h2>Everyday Efficiency:</h2><h2>In-place Construction</h2><h3>Back to Basics?</h3><div class='vertspace2'></div><blockquote nil><p>&quot;Make no collection of it: let him show<br>His skill is in the construction.&quot;</p><div></div><div class='author'>-- William Shakespeare, <em>Cymbeline</em></div></blockquote><div class='vertspace3'></div><h3>%a / <a href=\"http://twitter.com/ben_deane\">@ben_deane</a></h3><h4>%d</h4>
+
+* Gubbins                                                          :noexport:
+#+begin_source elisp
+(set-face-foreground 'font-lock-comment-face "magenta")
+(set-face-foreground 'font-lock-comment-delimiter-face "magenta")
+#+end_source
+
+* Disclaimer
+#+REVEAL_HTML: <div class='vertspace2'></div>
+
+I'm going to critique some code in this talk.
+
+If it's like your code, please don't feel slighted.
+
+I assure you that I write and have written plenty of suboptimal code.
+
+Let's make code better together!
+
+#+begin_notes
+I developed this talk in response to code I saw in real-life codebases. The code
+was often written by people who knew C++ and were trying to take advantage of
+modern features like move semantics and perfect forwarding, but were doing so in
+a way that was sometimes ineffective and sometimes looked like "magical
+thinking". Basically they were trying to do the efficient thing, but so often
+failing to. So I made this talk to try to help.
+
+Who here is using C++20? 17? 14? 11? pre-11?
+
+There is something here for everyone, even if you're still on a compiler without
+move semantics.
+
+For each slide with code, there will be a star in the corner indicating which
+version of C++ it applies to.
+#+end_notes
 
 * Get Ready
+#+REVEAL_HTML: <div class='vertspace2'></div>
 
 1. What happens when we ~move~ something?
 1. Copy elision (RVO)
@@ -36,20 +71,7 @@
 There will be a lot of code snippets in this talk.
 
 I will be asking a lot of questions.
-
-I'm assuming everyone is using C++14, although most things we talk about will
-require no more than C++11. I'll mention a couple of C++17 features.
 #+END_NOTES
-
-* Disclaimer
-
-I'm going to critique some code in this talk.
-
-If it's your code, please don't feel slighted.
-
-I assure you that I write and have written plenty of suboptimal code.
-
-Let's make code better together!
 
 * Preliminaries
 
@@ -86,6 +108,8 @@ snippets of code behave.
 #+REVEAL_HTML: <div class='vertspace2'></div>
 #+REVEAL_HTML: <blockquote nil><p>&quot;Mov'd! In good time! Let him that mov'd you hither<br>remove you hence.&quot;</p>
 #+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>The Taming of the Shrew</em></div></blockquote>
+#+REVEAL_HTML: <div class='vertspace2'></div>
+Are moves cheap or not?
 
 ** A moved-from ~vector~
 #+BEGIN_SRC c++
@@ -93,7 +117,7 @@ std::vector<int> v1 = {1, 2, 3, 4, 5};
 std::vector<int> v2 = std::move(v1);
 #+END_SRC
 
-What's in ~v1~ after the move?
+What's in ~v1~ after the ~move~?
 
 #+BEGIN_NOTES
 The standard says "valid but unspecified". We know that we're allowed to destroy
@@ -105,25 +129,40 @@ basically? (pointer-to-buffer, size, capacity). On destruction, what must it do?
 #+END_NOTES
 
 ** A moved-from ~vector~
-It must be destroyable.
+It /must/ be destroyable.
 
 What is sufficient? What is likely?
  - begin pointer is null?
  - size is zero?
  - capacity is zero?
 
+#+begin_notes
+I don't advocate guessing what the standard library implementation is doing, or
+relying on implementation, but it's worth thinking about these types of
+questions to inform outselves.
+#+end_notes
+
 ** Exhibit A
 #+BEGIN_SRC c++
-void WebSocketHandshakerImpl::ProcessServerHandshake(HttpMessage message)
+void WebClient::ProcessServerResponse(HttpMessage message)
 {
   // some stuff...
 
   m_result.extra = std::move(m_readBuffer);
-  m_result.headers = std::move(message.headers);
+  m_result.headers = std::move(message).headers;
 }
 #+END_SRC
 
 This code assumes that it's safe to do whatever comes later to a moved-from ~vector~.
+
+#+begin_notes
+~m_readBuffer~ here is a member variable that's used to accumulate the text of
+the server response.
+
+This variable gets reused on a later response. This code is assuming that it's
+safe to reuse after move. In this case, it is, because the way it's used is by
+appending elements.
+#+end_notes
 
 ** Now consider:
 
@@ -142,7 +181,7 @@ std::string s4 = std::move(s3);
 What's the moved-from state of ~s3~?
 
 #+BEGIN_NOTES
-What is the state of s1 in the second case? Same as the vector case basically.
+What is the state of s1 after the move? Same as the vector case basically.
 
 But the first example is small-string optimized. What happens when you move from
 a small string? You have to copy.
@@ -157,8 +196,10 @@ Bloomberg's STL does not clear a moved-from SSO string.
 #+END_NOTES
 
 ** Observation
-Moving from a ~string~ usually /isn't any faster/ than copying from it.
+#+REVEAL_HTML: <div class='vertspace2'></div>
+Moving from a ~string~ /usually isn't any faster/ than copying from it.
 
+#+REVEAL_HTML: <div class='vertspace2'></div>
 (If you doubt this, ask yourself why the small string optimization exists in the
 first place.)
 
@@ -174,12 +215,13 @@ And as noted, it may be technically slower.
 #+BEGIN_SRC c++
 void Context::Trigger(/* some args */)
 {
-  // Make sure that it will trigger only once.
-  const OnResponseCallback cb = std::move(m_responseCallback);
+  using ResponseCallback = std::function</* some signature */>;
 
-  if (cb)
+  // Make sure that it will trigger only once.
+  const ResponseCallback callback = std::move(m_responseCallback);
+  if (callback)
   {
-    cb(errorCode, errorReason, payload, size, opaque);
+    callback(errorCode, errorReason, payload, size, opaque);
   }
 }
 #+END_SRC
@@ -195,7 +237,7 @@ Think back to the vector case now: what happens if the container is replaced
 with a small-buffer optimizable container?
 #+END_NOTES
 
-** Guideline (specific)
+** Guideline
 Don't assume things are empty after a ~move~.
 
 Use ~exchange~ to make sure. Assigning an empty object is a trivial price for
@@ -209,7 +251,12 @@ const OnResponseCallback cb = std::exchange(m_responseCallback, nullptr);
 
 Make your code safe for future small-buffer optimizations.
 
-** Guideline (more general)
+#+begin_notes
+~std::exchange~ is an underappreciated function. It's C++14 but if you're only
+on C++11 you can easily provide your own version.
+#+end_notes
+
+** Guideline (more general)                                        :noexport:
 If you didn't write the move constructor/operator yourself, after a ~move~, you
 may assume:
 
@@ -230,7 +277,7 @@ But I'm not saying anything that, I'm just saying something /more/ constrained,
 and safer.
 #+END_NOTES
 
-** Let's look at this again
+** Let's look at this again                                       :noexport:
 #+BEGIN_SRC c++
 void WebSocketHandshakerImpl::ProcessServerHandshake(HttpMessage message)
 {
@@ -259,7 +306,7 @@ The second is saying "hey, this is an rvalue, unless something else prevents it"
 So what would "prevent it"?
 #+END_NOTES
 
-** There may be trouble ahead
+** There may be trouble ahead                                     :noexport:
 Let's say we want always want pretty much the same headers for all requests.
 
 What if we decided to change this...
@@ -285,7 +332,7 @@ What happens when we change ~Header~ to a reference?
 The HttpMessage itself can be an rvalue, but what it's referencing isn't.
 #+END_NOTES
 
-** Guideline
+** Guideline                                                      :noexport:
 Use ~std::move(obj).member~ rather than ~std::move(obj.member)~
 
 #+BEGIN_SRC c++
@@ -301,7 +348,7 @@ If we cast obj to an rvalue-ref, its member will also (usually) be an rvalue
 ref, no problem. We aren't losing anything and we're gaining safety.
 #+END_NOTES
 
-** ~move~ safety guidelines
+** ~move~ safety guidelines                                       :noexport:
  - after ~std::move~, destroy or assign /only/
  - use ~std::exchange~ to move-and-clear
  - use ~std::move(obj).member~, not ~std::move(obj.member)~
@@ -316,7 +363,29 @@ constructors. You're going to be working in terms of the subobjects.
 #+REVEAL_HTML: <blockquote nil><p>&quot;If you will, lead these graces to the grave<br>And leave the world no copy.&quot;</p>
 #+REVEAL_HTML: <div></div><div class='author'>-- William Shakespeare, <em>Twelfth Night, or What You Will</em></div></blockquote>
 
+
 ** Copy Elision, aka RVO
+#+REVEAL_HTML: <div class='vertspace2'></div>
+Q. What is the Return Value Optimization?
+#+REVEAL_HTML: <div class='vertspace2'></div>
+A. Perhaps the most important optimization the compiler does.
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[[http://eel.is/c++draft/class.copy.elision][class.copy.elision]]]
+
+#+begin_notes
+When we talk about in-place construction, the return value optimization is a
+good starting point.
+
+This is such an important optimization that all competitive compilers have done
+it for decades. And it's right on the border of optimizations your compiler will
+do for you whether or not you ask for it.
+
+If you look for it in the standard, it's called class.copy.elision. But that's
+not the whole story, because that deals with so-called NAMED RVO. There is also
+elision of temporaries or UNNAMED RVO which is often much more reliable.
+#+end_notes
+
+** Copy Elision, aka RVO                                          :noexport:
 
 What is the return value optimization?
 
@@ -344,45 +413,60 @@ bar() has two local variables.
 when foo() calls bar() it "passes" the address of the stack variable s.
 #+END_NOTES
 
-** RVO in pictures: No RVO
+** RVO in pictures: No RVO                                        :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./no-rvo1.svg]]
 
-** RVO in pictures: No RVO
+** RVO in pictures: No RVO                                        :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./no-rvo2.svg]]
 
-** RVO in pictures: No RVO
+** RVO in pictures: No RVO                                        :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./no-rvo3.svg]]
 
-** RVO in pictures: No RVO
+** RVO in pictures: No RVO                                        :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./no-rvo4.svg]]
 
-** RVO in pictures: No RVO
+** RVO in pictures: No RVO                                        :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./no-rvo5.svg]]
 
-** RVO in pictures: RVO
+** RVO in pictures: RVO                                           :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./rvo1.svg]]
 
-** RVO in pictures: RVO
+** RVO in pictures: RVO                                           :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./rvo2.svg]]
 
-** RVO in pictures: RVO
+** RVO in pictures: RVO                                           :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./rvo3.svg]]
 
-** RVO in pictures: RVO
+** RVO in pictures: RVO                                           :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./rvo4.svg]]
 
-** RVO in pictures: RVO
+** RVO in pictures: RVO                                           :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 [[./rvo5.svg]]
+
+
+** RVO in pictures
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./rvo_singleslide.svg]]
+
+#+begin_notes
+When a function is called, the caller passes an extra argument: the address of
+the return value, which is in the caller's stack frame. So that when the callee
+returns, it can copy the returned value to that address.
+
+The return value optimization is where the callee can construct the result
+directly in the space reserved in the caller's stack frame. There is no need for
+the callee to have space in its stack frame, or incur the copy on return.
+#+end_notes
 
 ** When can RVO not apply?
 
@@ -390,6 +474,16 @@ RVO Rules: what is returned has to be either:
 
  - a temporary (prvalue)
  - the name of a stack variable
+
+#+begin_notes
+So when it comes to thinking about whether or not RVO can happen, we have to
+think about two distinct things:
+
+- is it allowed by the standard?
+- is it possible?
+
+The standard rules are pretty simple. Either URVO or NRVO.
+#+end_notes
 
 ** When can RVO not apply?
 
@@ -400,8 +494,10 @@ RVO Ability: sometimes, the callee /can't/ construct the object in-place.
  - if the callee doesn't know enough
 
 #+BEGIN_NOTES
-Function arguments that are passed to you already-constructed can't be RVOed on
-return. But you can move them.
+More interesting is to think about when it's possible.
+
+Function arguments - that are passed to you already-constructed - can't be RVOed
+on return. But you can move them.
 
 You have to know at construction time that you're going to be returning that
 variable in order to RVO it.
@@ -435,18 +531,20 @@ std::string sad_function()
   return std::move(s);
 }
 #+END_SRC
-Don't ~return std::move(x)~ in most cases - you will get a move when you didn't need anything!
+
+Don't ~return std::move(x)~ in most cases - you will get a move when you didn't
+need anything!
 
 #+BEGIN_NOTES
-There are legitimate cases for returning an rvalue reference.
+There are legitimate cases for returning an rvalue reference. e.g. value
+wrappers with ref-qualified get functions.
 
-One of the few times when ~return std::move(x)~ is proper is when you're returning a
-member variable out of a rvalue-ref-qualified member function.
+But there are whole other talks on this.
 #+END_NOTES
 
 ** No RVO because wrong type, 2
 
-Factory functions can't RVO.
+Factory functions often can't RVO.
 #+BEGIN_SRC c++
 struct Base { ... };
 struct Derived : Base { ... };
@@ -495,16 +593,24 @@ M build_map()
 #+END_SRC
 
 #+BEGIN_NOTES
-RVO is really important for performance. It's probably the single most important
-optimization compilers make. Hence why it's been around for decades, even
-without a standard.
+Because move isn't necessarily cheap.
 
-If we accidentally inhibit RVO, we might also inhibit ~move~. We might get a
-copy.
+Imagine you have this code, and you don't have RVO (which you do here).
 
-~move~ isn't necessarily cheap. Microsoft's node-based containers allocate in
-their move constructors because they use sentinel nodes.
+Imagine this is using Microsoft's STL.
 #+END_NOTES
+
+** Why is RVO so important?
+#+REVEAL_HTML: <div class='vertspace2'></div>
+[[./map_move.png]]
+
+#+begin_notes
+Microsoft's current ABI uses stable sentinel nodes. This means a move construct
+of a node-based container must allocate.
+
+Practically the number one rule of performance is: you don't want to incur more
+allocations that you need to.
+#+end_notes
 
 ** Quiz time
 
@@ -704,7 +810,7 @@ However... there seems to be a bug in GCC where it doesn't RVO this. MSVC does
 and Clang does.
 
 Technically GCC is still adhering to the standard, because it's not required to
-RVO. It does in C++11 mode, just not in C++14 or C++17 mode.
+RVO. It does in C++11 mode, just not in later modes.
 #+END_NOTES
 
 ** Exhibit C
@@ -735,11 +841,11 @@ pattern gets copied...
 
 ** Guidelines for RVO-friendliness
 
- - don't const-qualify returned value types
+ - don't ~const~-qualify returned value types (useless)
  - almost never return ~std::move(x)~
  - return temporaries where you can
  - when you return named things, avoid conditions
- - don't parenthesize return expressions
+ - don't parenthesize return expressions (confusing)
 
 #+BEGIN_NOTES
 First point does not affect RVO but is generally useless.
