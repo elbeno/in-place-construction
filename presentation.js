@@ -12,122 +12,119 @@ function set_star(indexh, indexv) {
         // explaining the star
         1000: { display: 'block', innerHTML:'17' },
         // "preliminaries"
-        3000: { display: 'block', innerHTML:'11' },
+        2000: { display: 'block', innerHTML:'11' },
 
         // what's in a moved-from vector?
-        4001: { display: 'block', innerHTML:'11' },
+        3001: { display: 'block', innerHTML:'11' },
         // Exhibit A
-        4003: { display: 'block', innerHTML:'11' },
-        4004: { display: 'block', innerHTML:'11' },
+        3003: { display: 'block', innerHTML:'11' },
+        3004: { display: 'block', innerHTML:'11' },
 
         // Exhibit B
-        4006: { display: 'block', innerHTML:'11' },
+        3006: { display: 'block', innerHTML:'11' },
         // exchange std::function with nullptr
-        4007: { display: 'block', innerHTML:'14' },
+        3007: { display: 'block', innerHTML:'14' },
 
         // RVO in pictures
-        5002: { display: 'block', innerHTML:'98' },
+        4002: { display: 'block', innerHTML:'98' },
 
         // RVO examples
-        5005: { display: 'block', innerHTML:'98' },
-        5006: { display: 'block', innerHTML:'11' },
-        5007: { display: 'block', innerHTML:'11' },
-        5008: { display: 'block', innerHTML:'98' },
+        4005: { display: 'block', innerHTML:'98' },
+        4006: { display: 'block', innerHTML:'11' },
+        4007: { display: 'block', innerHTML:'98' },
+        4008: { display: 'block', innerHTML:'98' },
 
         // Will it RVO?
+        4011: { display: 'block', innerHTML:'11' },
+        4012: { display: 'block', innerHTML:'11' },
+        4013: { display: 'block', innerHTML:'11' },
+        4014: { display: 'block', innerHTML:'11' },
+        4015: { display: 'block', innerHTML:'11' },
+        4016: { display: 'block', innerHTML:'11' },
+        4017: { display: 'block', innerHTML:'11' },
+        4018: { display: 'block', innerHTML:'11' },
+        4019: { display: 'block', innerHTML:'11' },
+        4020: { display: 'block', innerHTML:'11' },
+        4021: { display: 'block', innerHTML:'14' },
+
+        // Exhibit C
+        4022: { display: 'block', innerHTML:'11' },
+
+        // reference returned from vector emplace_back
+        5001: { display: 'block', innerHTML:'17' },
+        5002: { display: 'block', innerHTML:'11' },
+        5003: { display: 'block', innerHTML:'17' },
+        5004: { display: 'block', innerHTML:'11' },
+        5005: { display: 'block', innerHTML:'17' },
+        5006: { display: 'block', innerHTML:'17' },
+
+        // copy example
+        5007: { display: 'block', innerHTML:'11' },
+        5008: { display: 'block', innerHTML:'11' },
+        5009: { display: 'block', innerHTML:'11' },
+        5010: { display: 'block', innerHTML:'11' },
+        5011: { display: 'block', innerHTML:'11' },
         5012: { display: 'block', innerHTML:'11' },
-        5013: { display: 'block', innerHTML:'11' },
+
+        // Exhibits D & E
+        5013: { display: 'block', innerHTML:'17' },
         5014: { display: 'block', innerHTML:'11' },
+
+        // vector-of-pairs
         5015: { display: 'block', innerHTML:'11' },
         5016: { display: 'block', innerHTML:'11' },
         5017: { display: 'block', innerHTML:'11' },
-        5018: { display: 'block', innerHTML:'11' },
-        5019: { display: 'block', innerHTML:'11' },
-        5020: { display: 'block', innerHTML:'11' },
-        5021: { display: 'block', innerHTML:'11' },
-
-        // Exhibit C
-        5022: { display: 'block', innerHTML:'11' },
-
-        // reference returned from vector emplace_back
-        6001: { display: 'block', innerHTML:'17' },
-        6002: { display: 'block', innerHTML:'11' },
-        6003: { display: 'block', innerHTML:'17' },
-        6004: { display: 'block', innerHTML:'11' },
-        6005: { display: 'block', innerHTML:'17' },
-        6006: { display: 'block', innerHTML:'17' },
-
-        // copy example
-        6007: { display: 'block', innerHTML:'11' },
-        6008: { display: 'block', innerHTML:'11' },
-        6009: { display: 'block', innerHTML:'11' },
-        6010: { display: 'block', innerHTML:'11' },
-        6011: { display: 'block', innerHTML:'11' },
-        6012: { display: 'block', innerHTML:'11' },
-
-        // Exhibits D & E
-        6013: { display: 'block', innerHTML:'17' },
-        6014: { display: 'block', innerHTML:'11' },
-
-        // vector-of-pairs
-        6015: { display: 'block', innerHTML:'11' },
-        6016: { display: 'block', innerHTML:'11' },
-        6017: { display: 'block', innerHTML:'11' },
 
         // initializer_list
-        7001: { display: 'block', innerHTML:'11' },
-        7002: { display: 'block', innerHTML:'11' },
-        7003: { display: 'block', innerHTML:'14' },
-        7004: { display: 'block', innerHTML:'11' },
-        7005: { display: 'block', innerHTML:'11' },
-        7006: { display: 'block', innerHTML:'??' },
-        7007: { display: 'block', innerHTML:'11' },
+        6001: { display: 'block', innerHTML:'11' },
+        6002: { display: 'block', innerHTML:'11' },
+        6003: { display: 'block', innerHTML:'14' },
+        6004: { display: 'block', innerHTML:'11' },
+        6005: { display: 'block', innerHTML:'11' },
+        6006: { display: 'block', innerHTML:'??' },
+        6007: { display: 'block', innerHTML:'11' },
 
         // map init
-        8001: { display: 'block', innerHTML:'11' },
-        8002: { display: 'block', innerHTML:'14' },
-        8003: { display: 'block', innerHTML:'14' },
+        7001: { display: 'block', innerHTML:'11' },
+        7002: { display: 'block', innerHTML:'14' },
+        7003: { display: 'block', innerHTML:'14' },
 
         // map insert
-        8005: { display: 'block', innerHTML:'98' },
-        8006: { display: 'block', innerHTML:'11' },
-        8007: { display: 'block', innerHTML:'11' },
-        8008: { display: 'block', innerHTML:'11' },
-        8009: { display: 'block', innerHTML:'11' },
-        8010: { display: 'block', innerHTML:'11' },
-        8011: { display: 'block', innerHTML:'11' },
+        7005: { display: 'block', innerHTML:'98' },
+        7006: { display: 'block', innerHTML:'11' },
+        7007: { display: 'block', innerHTML:'11' },
+        7008: { display: 'block', innerHTML:'11' },
+        7009: { display: 'block', innerHTML:'11' },
+        7010: { display: 'block', innerHTML:'11' },
+        7011: { display: 'block', innerHTML:'11' },
 
         // exhibit G
-        8012: { display: 'block', innerHTML:'11' },
-        8013: { display: 'block', innerHTML:'11' },
-        8014: { display: 'block', innerHTML:'11' },
+        7012: { display: 'block', innerHTML:'11' },
+        7013: { display: 'block', innerHTML:'11' },
+        7014: { display: 'block', innerHTML:'11' },
 
         // emplace function call result
-        8015: { display: 'block', innerHTML:'11' },
-        8017: { display: 'block', innerHTML:'17' },
-        8018: { display: 'block', innerHTML:'17' },
+        7015: { display: 'block', innerHTML:'11' },
+        7017: { display: 'block', innerHTML:'17' },
+        7018: { display: 'block', innerHTML:'17' },
 
         // insert_or_assign
-        8019: { display: 'block', innerHTML:'17' },
-        8020: { display: 'block', innerHTML:'17' },
-
-        // Exhibit H
-        8022: { display: 'block', innerHTML:'11' },
-        8023: { display: 'block', innerHTML:'17' },
+        7019: { display: 'block', innerHTML:'17' },
+        7020: { display: 'block', innerHTML:'17' },
 
         // aggregate initialization with parens
-        8024: { display: 'block', innerHTML:'20' },
+        7022: { display: 'block', innerHTML:'20' },
 
         // optional, etc
-        9001: { display: 'block', innerHTML:'17' },
-        9002: { display: 'block', innerHTML:'17' },
-        9003: { display: 'block', innerHTML:'17' },
-        9004: { display: 'block', innerHTML:'17' },
-        9005: { display: 'block', innerHTML:'17' },
-        9006: { display: 'block', innerHTML:'17' },
-        9007: { display: 'block', innerHTML:'17' },
-        9008: { display: 'block', innerHTML:'17' },
-        9009: { display: 'block', innerHTML:'17' },
+        8001: { display: 'block', innerHTML:'17' },
+        8002: { display: 'block', innerHTML:'17' },
+        8003: { display: 'block', innerHTML:'17' },
+        8004: { display: 'block', innerHTML:'17' },
+        8005: { display: 'block', innerHTML:'17' },
+        8006: { display: 'block', innerHTML:'17' },
+        8007: { display: 'block', innerHTML:'17' },
+        8008: { display: 'block', innerHTML:'17' },
+        8009: { display: 'block', innerHTML:'17' },
     };
     console.log('set_star ' + indexh + ' ' + indexv);
     var slide_no = indexh * 1000 + indexv;
@@ -140,9 +137,10 @@ function set_star(indexh, indexv) {
     }
 }
 
+
 function encode_source(source) {
     preamble = "http://localhost:10240/#g:!((g:!((g:!((h:codeEditor,i:(fontScale:1.2899450879999999,j:1,lang:c%2B%2B,source:'"
-    postamble = "'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:69.35593220338983,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:/usr/bin/clang%2B%2B,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',trim:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B2a',source:1),l:'5',n:'0',o:'/usr/bin/clang%2B%2B+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:11.159420289855072,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+/usr/bin/clang%2B%2B',t:'0')),header:(),l:'4',m:88.84057971014492,n:'0',o:'',s:0,t:'0')),k:30.644067796610173,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"
+    postamble = "'),l:'5',n:'0',o:'C%2B%2B+source+%231',t:'0')),k:69.35593220338983,l:'4',n:'0',o:'',s:0,t:'0'),(g:!((g:!((h:compiler,i:(compiler:clangdefault,filters:(b:'0',binary:'0',commentOnly:'0',demangle:'0',directives:'0',execute:'0',intel:'0',libraryCode:'1',trim:'1'),lang:c%2B%2B,libs:!(),options:'-O3+-std%3Dc%2B%2B2a',source:1),l:'5',n:'0',o:'clang+default+(Editor+%231,+Compiler+%231)+C%2B%2B',t:'0')),header:(),k:50,l:'4',m:11.159420289855072,n:'0',o:'',s:0,t:'0'),(g:!((h:output,i:(compiler:1,editor:1,fontScale:1.8575209267199997,wrap:'1'),l:'5',n:'0',o:'%231+with+clang+default',t:'0')),header:(),l:'4',m:88.84057971014492,n:'0',o:'',s:0,t:'0')),k:30.644067796610173,l:'3',n:'0',o:'',t:'0')),l:'2',n:'0',o:'',t:'0')),version:4"
     if (source.indexOf("will_it_rvo") != -1) {
         source = '#include <cstdio>\n\
 \n\

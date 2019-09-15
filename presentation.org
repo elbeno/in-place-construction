@@ -28,7 +28,7 @@
 (set-face-foreground 'font-lock-comment-delimiter-face "magenta")
 #+end_source
 
-* Disclaimer
+* Disclaimer                                                       :noexport:
 #+REVEAL_HTML: <div class='vertspace2'></div>
 
 I'm going to critique some code in this talk.
@@ -39,7 +39,7 @@ I assure you that I write and have written plenty of suboptimal code.
 
 Let's make code better together!
 
-#+begin_notes
+#+BEGIN_NOTES
 I developed this talk in response to code I saw in real-life codebases. The code
 was often written by people who knew C++ and were trying to take advantage of
 modern features like move semantics and perfect forwarding, but were doing so in
@@ -54,7 +54,9 @@ move semantics.
 
 For each slide with code, there will be a star in the corner indicating which
 version of C++ it applies to.
-#+end_notes
+
+I will be asking a lot of questions.
+#+END_NOTES
 
 * Get Ready
 #+REVEAL_HTML: <div class='vertspace2'></div>
@@ -68,7 +70,20 @@ version of C++ it applies to.
 1. Final thoughts
 
 #+BEGIN_NOTES
-There will be a lot of code snippets in this talk.
+I developed this talk in response to code I saw in real-life codebases. The code
+was often written by people who knew C++ and were trying to take advantage of
+modern features like move semantics and perfect forwarding, but were doing so in
+a way that was sometimes ineffective and sometimes looked like "magical
+thinking". Basically they were trying to do the efficient thing, but so often
+failing to. So I made this talk to try to help.
+
+Who here is using C++20? 17? 14? 11? pre-11?
+
+There is something here for everyone, even if you're still on a compiler without
+move semantics.
+
+For each slide with code, there will be a star in the corner indicating which
+version of C++ it applies to.
 
 I will be asking a lot of questions.
 #+END_NOTES
@@ -148,7 +163,7 @@ void WebClient::ProcessServerResponse(HttpMessage message)
 {
   // some stuff...
 
-  m_result.extra = std::move(m_readBuffer);
+  m_result.body = std::move(m_bodyBuffer);
   m_result.headers = std::move(message).headers;
 }
 #+END_SRC
@@ -205,7 +220,7 @@ first place.)
 
 Moves /only/ matter for objects on the heap.
 
-http://quick-bench.com/7zo0OLXgCyR3v_KwZKNIe5Z5Z64
+http://quick-bench.com/eb54Wv8Bmvr08frpgtqFOIxQqa4
 
 #+BEGIN_NOTES
 And as noted, it may be technically slower.
@@ -221,7 +236,7 @@ void Context::Trigger(/* some args */)
   const ResponseCallback callback = std::move(m_responseCallback);
   if (callback)
   {
-    callback(errorCode, errorReason, payload, size, opaque);
+    callback(/* args */);
   }
 }
 #+END_SRC
@@ -238,18 +253,17 @@ with a small-buffer optimizable container?
 #+END_NOTES
 
 ** Guideline
-Don't assume things are empty after a ~move~.
+Don't assume "containers" are empty after a ~move~.
 
-Use ~exchange~ to make sure. Assigning an empty object is a trivial price for
-safety.
+If you need to be sure, use ~exchange~.
 
 #+BEGIN_SRC c++
 m_result.extra = std::exchange(m_readBuffer, {});
 
-const OnResponseCallback cb = std::exchange(m_responseCallback, nullptr);
+const ResponseCallback cb = std::exchange(m_responseCallback, nullptr);
 #+END_SRC
 
-Make your code safe for future small-buffer optimizations.
+This makes your code safe for future small-buffer optimizations.
 
 #+begin_notes
 ~std::exchange~ is an underappreciated function. It's C++14 but if you're only
@@ -472,7 +486,7 @@ the callee to have space in its stack frame, or incur the copy on return.
 
 RVO Rules: what is returned has to be either:
 
- - a temporary (prvalue)
+ - a temporary (prvalue) - guaranteed in C++17
  - the name of a stack variable
 
 #+begin_notes
@@ -521,7 +535,7 @@ C++11 mandates that if you can't do the RVO, you must try to move and only copy
 as a last resort.
 #+END_NOTES
 
-** No RVO because wrong type, 1
+** No RVO because wrong type
 
 An rvalue-ref is not the same type.
 #+BEGIN_SRC c++
@@ -540,25 +554,6 @@ There are legitimate cases for returning an rvalue reference. e.g. value
 wrappers with ref-qualified get functions.
 
 But there are whole other talks on this.
-#+END_NOTES
-
-** No RVO because wrong type, 2
-
-Factory functions often can't RVO.
-#+BEGIN_SRC c++
-struct Base { ... };
-struct Derived : Base { ... };
-
-std::shared_ptr<Base> factory()
-{
-  return std::make_shared<Derived>();
-}
-#+END_SRC
-But will still move.
-
-#+BEGIN_NOTES
-This is also true of any types that are inter-convertible.
-e.g. returning a pair when the function returns a tuple, or something like that.
 #+END_NOTES
 
 ** No RVO because not enough info
@@ -582,15 +577,17 @@ Again, return value will still be moved.
 ** Why is RVO so important?
 
 #+BEGIN_SRC c++
-using M = std::map<std::string, int>;
+using PhoneBook = std::map<std::string, int>;
 
-M build_map()
+PhoneBook build_phonebook()
 {
-  M m;
-  m.insert(std::make_pair("Jenny", 8675309));
-  return m;
+  PhoneBook pb;
+  pb.insert(std::make_pair("Jenny", 8675309));
+  return pb;
 }
 #+END_SRC
+
+Because /moves aren't necessarily cheap/.
 
 #+BEGIN_NOTES
 Because move isn't necessarily cheap.
@@ -605,13 +602,16 @@ Imagine this is using Microsoft's STL.
 [[./map_move.png]]
 
 #+begin_notes
-Microsoft's current ABI uses stable sentinel nodes. This means a move construct
-of a node-based container must allocate.
+This is an explanation from Billy O'Neal about why ~std::map~ has ~noexcept~
+move assignment, but move constructor is /not/ ~noexcept~.
 
-(A move assign need not.)
+Microsoft's current ABI uses stable sentinel nodes. This means a move construct
+of a node-based container must allocate. A move assign need not.
 
 Practically the number one rule of performance is: you don't want to incur more
 allocations that you need to.
+
+So even when objects are on the heap, moves might not be cheap.
 #+end_notes
 
 ** Quiz time
@@ -744,7 +744,7 @@ S will_it_rvo(bool b)
 #+END_SRC
 
 #+ATTR_REVEAL: :frag (appear)
-No. (Against the rules.)
+No. (Against the rules - not "the name of a stack variable".)
 
 #+BEGIN_NOTES
 No RVO. We're not naming a variable.
@@ -801,7 +801,7 @@ S will_it_rvo()
 #+END_SRC
 
 #+ATTR_REVEAL: :frag (appear)
-Yes.
+Yes (Clang/MSVC), no (GCC).
 #+ATTR_REVEAL: :frag (appear)
 [[http://eel.is/c++draft/class.copy.elision#3.1][class.copy.elision \S 3.1]]
 
@@ -814,6 +814,33 @@ and Clang does.
 Technically GCC is still adhering to the standard, because it's not required to
 RVO. It does in C++11 mode, just not in later modes.
 #+END_NOTES
+
+** Finally, what's the return value?
+#+begin_src c++
+struct P {
+  constexpr P() : x{0} {}
+  constexpr P(P&&) : x{1} {}
+  int x;
+};
+
+constexpr auto will_this_rvo() {
+  P p;
+  return p;
+}
+
+int main() {
+  const auto p = will_this_rvo();
+  return p.x;
+}
+#+end_src
+
+#+begin_notes
+~constexpr~ prevents named RVO... but compilers differ.
+
+GCC will not RVO this even if ~p~ is not ~const~. (Is this a bug?)
+
+Clang RVOs this if not ~const~.
+#+end_notes
 
 ** Exhibit C
 
@@ -841,7 +868,7 @@ Just an integral type here, so no big deal. But if it gets changed, or this
 pattern gets copied...
 #+END_NOTES
 
-** Guidelines for RVO-friendliness
+** Guidelines for RVO-friendliness                                :noexport:
 
  - don't ~const~-qualify returned value types (useless)
  - almost never return ~std::move(x)~
@@ -871,7 +898,7 @@ A brief respite...
 Here's where we start to get into the nitty-gritty.
 
 Fair warning: there will probably come a time in this talk when you think, "why
-is C++ this complicated?"
+is C++ this complicated?" (If this hasn't already crossed your mind.)
 
 But for now, let's press on...
 #+end_notes
@@ -1016,10 +1043,10 @@ Recall: our ~S~ class has a constructor from ~Arg~, and an ~explicit~ constructo
 from ~int~.
 
 #+BEGIN_SRC c++
-std::vector<S> v;
 std::array<Arg, 3> a = { Arg{}, Arg{}, Arg{} };
-v.reserve(a.size());
 
+std::vector<S> v;
+v.reserve(a.size());
 std::copy(a.cbegin(), a.cend(), std::back_inserter(v));
 #+END_SRC
 
@@ -1034,10 +1061,10 @@ the ~vector~.
 What if we have an ~array~ of ~int~?
 
 #+BEGIN_SRC c++
-std::vector<S> v;
 std::array a = { 1,2,3,4,5 };
-v.reserve(a.size());
 
+std::vector<S> v;
+v.reserve(a.size());
 std::copy(a.cbegin(), a.cend(), std::back_inserter(v));
 #+END_SRC
 
@@ -1434,7 +1461,7 @@ decay to a char*, we're going to call strlen at some point.
 ** Recommendations
 
  - use ~initializer_list~ only for literal types
- - consider using ~array~ and manually moving
+ - consider using ~array~ and manually moving?
  - probably don't use ~initializer_list~ for anything that'll get run more than
    once
  - wait for an ~in_place_t~ constructor on ~vector~?
@@ -1443,13 +1470,15 @@ decay to a char*, we're going to call strlen at some point.
 
 #+BEGIN_NOTES
 I'm not sure what to recommend. Really the first point, and the last.
+
+There are not many good answers here.
 #+END_NOTES
 
 * 5. Putting stuff into a ~map~
 
 (or other associative container)
 
-It's a bit complicated.
+It's +a bit+ complicated.
 
 #+REVEAL_HTML: <div class='vertspace2'></div>
 #+REVEAL_HTML: <blockquote nil><p>&quot;A plague upon it! I have forgot the map.&quot;</p>
@@ -1579,7 +1608,7 @@ a default constructor! It's fine to use objects without default constructors in
 a map, if you never use this function. And that can be a significant thing.
 #+END_NOTES
 
-** The Other Easy Way: ~insert~
+** The Other Easy(?) Way: ~insert~
 
 #+BEGIN_SRC c++
 // recall S has an implicit constructor from Arg
@@ -1687,7 +1716,6 @@ we can't syntactically pass "zero arguments" in the place of an argument.
 We don't want to default-construct an S explicitly here and move it in.
 #+END_NOTES
 
-
 ** ~emplace~ problem
 
 What do we do when we want to default-construct the value?
@@ -1734,14 +1762,14 @@ Here's the piecewise constructor on ~pair~ again.
 ** Exhibit G
 
 #+BEGIN_SRC c++
-// explicit ClientIdRecord(
+// explicit ClientRecord(
 //    const string& clientId,
-//    const ProcessId& clientProc,
-//    const ProcessId& serverProc);
+//    const ProcessId& clientProcess,
+//    const MachineId& clientMachine);
 
-using Storage = std::unordered_set<ClientIdRecord>;
+using Storage = std::unordered_set<ClientRecord>;
 Storage m_storage;
-m_storage.emplace(inClientId, clientProc, serverProc);
+m_storage.emplace(clientId, processId, machineId);
 #+END_SRC
 
 Perfectly fine as far as ~emplace~ usage.
@@ -1749,9 +1777,9 @@ Perfectly fine as far as ~emplace~ usage.
 Then we want to change the ~unordered_set~ to an ~unordered_map~.
 
 #+BEGIN_NOTES
-ClientIdRecord has a 3-argument constructor.
+ClientRecord has a 3-argument constructor.
 
-~inClientId~ is a string.
+~clientId~ is a string.
 
 One in-place construct. This is fine.
 #+END_NOTES
@@ -1759,16 +1787,16 @@ One in-place construct. This is fine.
 ** Exhibit G
 
 #+BEGIN_SRC c++
-// explicit ClientIdRecord(
+// explicit ClientRecord(
 //    const string& clientId,
-//    const ProcessId& clientProc,
-//    const ProcessId& serverProc);
+//    const ProcessId& clientProcess,
+//    const MachineId& clientMachine);
 
-using Storage = std::unordered_map<std::string, ClientIdRecord>;
+using Storage = std::unordered_map<std::string, ClientRecord>;
 Storage m_storage;
 m_storage.emplace(
-  std::make_pair(inClientId,
-                 ClientIdRecord(inClientId, clientProc, serverProc)));
+  std::make_pair(clientId,
+                 ClientRecord(clientId, processId, machineId)));
 #+END_SRC
 
 Is this optimal?
@@ -1783,11 +1811,11 @@ How do we do better?
 ** Exhibit G
 
 #+BEGIN_SRC c++
-using Storage = std::unordered_map<std::string, ClientIdRecord>;
+using Storage = std::unordered_map<std::string, ClientRecord>;
 Storage m_storage;
 m_storage.emplace(std::piecewise_construct,
-                  std::forward_as_tuple(inClientId),
-                  std::forward_as_tuple(inClientId, clientProc, serverProc));
+                  std::forward_as_tuple(clientId),
+                  std::forward_as_tuple(clientId, processId, machineId));
 #+END_SRC
 
 Use ~piecewise_construct~ again.
@@ -1835,7 +1863,7 @@ struct with_result_of_t
 {
   using T = std::invoke_result_t<F>;
   explicit with_result_of_t(F&& f) : f(std::forward<F>(f)) {}
-  operator T() { return f(); }
+  /* explicit(false) */ operator T() { return f(); }
 
 private:
   F f;
@@ -1856,6 +1884,10 @@ Capture the function and call it only at the point that we want to convert the
 result to an ~S~.
 
 ~invoke_result_t~ is C++17 - before that you can use ~result_of_t~.
+
+Note ~explicit(false)~ is C++20.
+
+"Andre Ksheminski"
 #+END_NOTES
 
 ** ~emplace~ problem 2
@@ -1876,8 +1908,8 @@ Compilers are really good at optimizing single-use lambdas.
 In general, compilers do better here with the lambda than with the free
 function.
 
-You would think the second line here would work just as well. But VC++
-doesn't manage to elide the move.
+You would think the second line here would work just as well. But VC++17 at
+least doesn't manage to elide the move.
 #+END_NOTES
 
 ** C++17: ~insert_or_assign~
@@ -1932,8 +1964,10 @@ things in a ~map~...
  - ~emplace~ takes a parameter pack
  - ~try_emplace~ takes a key and a parameter pack
  - ~insert_or_assign~ takes a key and [something convertible to] a value
-   - so does ~operator[]~
+   - so does ~operator[]~ (without forwarding)
  - ~merge~ takes another map...
+
+See also: [[https://www.youtube.com/watch?v=kye4aD-KvTU]["A Clean and Minimal Map API"]] -- Chandler Carruth, C++Now 2019
 
 #+BEGIN_NOTES
 This is unfortunate.
@@ -1945,7 +1979,7 @@ Actually, you probably already reached that point about 20 slides back, didn't
 you...
 #+END_NOTES
 
-** Exhibit H
+** Exhibit H                                                      :noexport:
 
 #+BEGIN_SRC c++
 template <typename K, typename V>
@@ -1980,7 +2014,7 @@ also weakly-referenced from a deque (see Append call)?
 - extra shared_ptr ref
 #+END_NOTES
 
-** Exhibit H
+** Exhibit H                                                      :noexport:
 
 #+BEGIN_SRC c++
 // Insert the new value.
@@ -2018,7 +2052,10 @@ In C++20, we get parenthesized initialization for aggregate types.
 
 This should mean you can get in-place construction for them too without
 moving(copying) and without tediously having to provide SMFs to achieve
-optimality.
+optimality (and technically not be an aggregate).
+
+Question: does this mean emplace can do narrowing conversions with parenthetical
+initialization? And what does it do now?
 #+end_notes
 
 ** Recommendations
@@ -2030,10 +2067,12 @@ Yes, C++ is complicated.
    - But don't use call-site explicit construction
  - Use ~emplace~ but beware of explicit construction
  - Use ~piecewise_construct~ for other than single-arg construction
- - Try to avoid ~operator[]~
+ - Use ~operator[]~ only when you know the key exists
  - Adopt ~insert_or_assign~ when you can
  - Consider ~with_result_of~
  - Aggregates will suck until C++20
+
+Or, use a non-standard map with a better API
 
 * 6. Putting stuff into other things
 
@@ -2157,9 +2196,9 @@ std::variant<int, S> v = 1;
 #+BEGIN_NOTES
 Similar story as ~optional~.
 
-But there is the potential for a bug with the ~explicit~ constructor. What makes
-this somewhat likely is that it might be the case that someone makes a
-constructor explicit later on.
+But there is the potential for a bug with the ~explicit~ constructor. Especially
+if someone changes a constructor's explicitness after code is written, or if
+you're trying to do something in generic code.
 #+END_NOTES
 
 ** ~variant~ construction
@@ -2208,8 +2247,7 @@ int main() {
 
 What does this output?
 
-#+ATTR_REVEAL: :frag (appear)
-C++20 P0608 A sane variant converting constructor
+#+REVEAL_HTML: <p class="fragment (appear)">C++20 <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0608r3.html">P0608</a> A sane variant converting constructor</p>
 
 #+BEGIN_NOTES
 Avoid implicit type conversions. They're dangerous. The first possible one will apply.
